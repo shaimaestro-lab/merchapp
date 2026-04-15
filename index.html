@@ -333,8 +333,7 @@
             window.scrollTo(0,0);
         };
 
-        let touchStartX = 0, touchEndX = 0, touchStartY = 0, touchEndY = 0; const mainEl = document.querySelector('main'); mainEl.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }); mainEl.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; touchEndY = e.changedTouches[0].screenY; handleSwipe(); });
-        const handleSwipe = () => { const diffX = Math.abs(touchEndX - touchStartX); const diffY = Math.abs(touchEndY - touchStartY); if (diffX < 120 || diffY > diffX) return; const tabs = ['dashboard', 'add-show', 'vendor', 'tour-stock', 'inventory', 'label']; const current = tabs.find(t => document.getElementById(`view-${t}`).classList.contains('active')); const idx = tabs.indexOf(current); if (touchEndX < touchStartX - 120 && idx < tabs.length - 1) window.router(tabs[idx + 1]); if (touchEndX > touchStartX + 120 && idx > 0) window.router(tabs[idx - 1]); };
+
 
         const fireConfetti = () => { const canvas = document.getElementById('confetti-canvas'); const ctx = canvas.getContext('2d'); canvas.width = window.innerWidth; canvas.height = window.innerHeight; const particles = []; for(let i=0; i<100; i++) particles.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height-canvas.height, vx: Math.random()*4-2, vy: Math.random()*5+5, color: `hsl(${Math.random()*360}, 70%, 50%)`, size: Math.random()*8+4}); const animate = () => { ctx.clearRect(0,0, canvas.width, canvas.height); let active = false; particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size); if(p.y<canvas.height) active=true; }); if(active) requestAnimationFrame(animate); else ctx.clearRect(0,0,canvas.width, canvas.height); }; animate(); };
 
