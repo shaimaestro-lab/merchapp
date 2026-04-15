@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shai Maestro Merch Sales</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            -webkit-tap-highlight-color: transparent; 
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a; 
+            overscroll-behavior-y: none;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .view-section { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .view-section.active { display: block; opacity: 1; }
+        .input-modern {
+            @apply w-full border-2 border-slate-200 rounded-xl px-4 py-3 font-bold focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-none transition-all shadow-sm appearance-none;
+            background-color: #ffffff !important; color: #000000 !important;
+        }
+        input[type="date"] { background-color: white !important; }
+        .card-modern {
+            @apply bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700/50 mb-5 relative overflow-hidden;
+        }
+        .btn-primary {
+            @apply w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/40 transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-3 text-lg;
+        }
+        .btn-save-gig {
+            @apply w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-5 px-6 rounded-3xl shadow-[0_10px_40px_-10px_rgba(16,185,129,0.5)] transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-4 text-xl tracking-wide uppercase border-t border-emerald-400/20;
+            animation: pulse-subtle 3s infinite;
+        }
+        .btn-fun {
+            @apply w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-black py-4 px-6 rounded-2xl shadow-xl shadow-fuchsia-900/40 transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-3 text-lg tracking-wide uppercase;
+        }
+        .btn-vendor {
+            @apply w-full bg-slate-700 hover:bg-slate-600 active:bg-blue-600 active:scale-95 text-white font-bold rounded-2xl shadow-lg border border-slate-600 transition-all duration-150 flex flex-col items-center justify-center relative overflow-hidden;
+            height: 140px;
+        }
+        .btn-secondary {
+            @apply w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold py-3 px-4 rounded-xl shadow border border-slate-600 transform transition-all active:scale-95 flex justify-center items-center gap-2;
+        }
+        .nav-btn { @apply text-slate-500 transition-all duration-300 flex flex-col items-center justify-center h-full w-full relative z-10; }
+        .nav-active { @apply text-blue-400; }
+        .nav-active::before {
+            content: ''; position: absolute; width: 3.5rem; height: 3.5rem; border-radius: 9999px; border: 1px solid rgba(96,165,250,0.3); background: rgba(59,130,246,0.1); z-index: -1; bottom: 40%; transform: translateY(20%); box-shadow: 0 0 20px rgba(96,165,250,0.4); animation: pulse-glow 2s infinite;
+        }
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 15px rgba(96,165,250,0.4); } 50% { box-shadow: 0 0 25px rgba(96,165,250,0.7); } 100% { box-shadow: 0 0 15px rgba(96,165,250,0.4); } }
+        @keyframes pulse-subtle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+        #toast { visibility: hidden; min-width: 280px; background-color: #333; color: #fff; text-align: center; border-radius: 50px; padding: 16px; position: fixed; z-index: 100; left: 50%; bottom: 120px; transform: translateX(-50%); font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s, bottom 0.3s; }
+        #toast.show { visibility: visible; opacity: 1; bottom: 130px; }
+        .input-group-text-overlay { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94a3b8; font-weight: 800; }
+        
+        .timeline-connector { position: absolute; left: 24px; top: 0; bottom: 0; width: 3px; z-index: 0; opacity: 0.5; }
+        .tour-header { @apply cursor-pointer select-none transition-all active:scale-95; }
+        .capacity-bar { height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.1); }
+        .capacity-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen pb-32 selection:bg-blue-500 selection:text-white overflow-x-hidden">
+    <canvas id="confetti-canvas"></canvas>
+    <header class="fixed top-0 w-full bg-slate-900/95 backdrop-blur-xl border-b border-slate-800 z-50 px-5 py-4 flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 border border-white/10"><i class="fas fa-music text-white text-lg"></i></div>
+            <div><h1 class="text-lg font-extrabold tracking-tight text-white leading-none">Shai Maestro</h1><p class="text-[10px] text-blue-400 font-bold tracking-widest uppercase mt-0.5">Merch Sales</p></div>
+        </div>
+        <button onclick="router('settings')" class="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition shadow-inner border border-slate-700"><i class="fas fa-cog"></i></button>
+    </header>
+    <main id="app-content" class="pt-28 px-4 max-w-lg mx-auto relative min-h-screen">
+        <div id="view-dashboard" class="view-section active"></div>
+        <div id="view-add-show" class="view-section"></div>
+        <div id="view-vendor" class="view-section"></div> 
+        <div id="view-tour-stock" class="view-section"></div>
+        <div id="view-inventory" class="view-section"></div>
+        <div id="view-label" class="view-section"></div>
+        <div id="view-settings" class="view-section"></div>
+    </main>
+    <div id="modalOverlay" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl w-full max-w-sm border border-slate-700 shadow-2xl transform transition-all scale-95 opacity-0" id="modalContent">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4"><h3 class="text-xl font-bold text-white text-center w-full" id="modalTitle">Details</h3><button onclick="closeModal()" class="absolute right-6 text-slate-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+                <div id="modalBody" class="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar"></div>
+                <div class="mt-6 pt-4 border-t border-slate-700 flex gap-3" id="modalFooter"></div>
+            </div>
+        </div>
+    </div>
+    <div id="toast"><div class="flex items-center justify-center gap-3"><i class="fas fa-check-circle text-green-400 text-xl" id="toastIcon"></i><span id="toastMsg" class="font-bold">Action Saved</span></div><button onclick="handleUndo()" id="undoBtn" class="mt-2 text-xs text-blue-300 underline font-bold uppercase tracking-wider block w-full">Undo</button></div>
+    <nav class="fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-2xl border-t border-slate-800 pb-safe z-50 h-24 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+        <div class="flex justify-between items-center h-16 max-w-lg mx-auto px-1 pt-2">
+            <button id="nav-dashboard" onclick="router('dashboard')" class="nav-btn nav-active"><i class="fas fa-chart-pie mb-1"></i><span class="text-[9px] font-bold uppercase">Overview</span></button>
+            <button id="nav-add-show" onclick="router('add-show')" class="nav-btn"><i class="fas fa-glasses mb-1"></i><span class="text-[9px] font-bold uppercase">Gig Log</span></button>
+            <button id="nav-vendor" onclick="router('vendor')" class="nav-btn"><div class="bg-blue-600 rounded-full w-12 h-12 flex items-center justify-center shadow-lg shadow-blue-500/40 transform -translate-y-3 border-4 border-slate-900 relative z-20"><i class="fas fa-plus text-white text-xl"></i></div><span class="text-[9px] font-bold uppercase absolute -bottom-1 w-full text-center">Vendor</span></button>
+            <button id="nav-tour-stock" onclick="router('tour-stock')" class="nav-btn"><i class="fas fa-bus mb-1"></i><span class="text-[9px] font-bold uppercase">Tour</span></button>
+            <button id="nav-inventory" onclick="router('inventory')" class="nav-btn"><i class="fas fa-warehouse mb-1"></i><span class="text-[9px] font-bold uppercase">Home</span></button>
+            <button id="nav-label" onclick="router('label')" class="nav-btn"><i class="fas fa-file-invoice mb-1"></i><span class="text-[9px] font-bold uppercase">Label</span></button>
+        </div>
+    </nav>
+    <datalist id="currency-list">
+        <option value="BRL">Brazilian Real (R$)</option><option value="CAD">Canadian Dollar ($)</option><option value="CHF">Swiss Franc (Fr)</option><option value="CLP">Chilean Peso ($)</option><option value="CNY">Chinese Yuan (¥)</option><option value="CZK">Czech Koruna (Kč)</option><option value="DKK">Danish Krone (kr)</option><option value="EUR">Euro (€)</option><option value="GBP">British Pound (£)</option><option value="GEL">Georgian Lari (₾)</option><option value="HKD">Hong Kong Dollar ($)</option><option value="HUF">Hungarian Forint (Ft)</option><option value="ILS">Israeli Shekel (₪)</option><option value="INR">Indian Rupee (₹)</option><option value="ISK">Icelandic Króna (kr)</option><option value="JPY">Japanese Yen (¥)</option><option value="KRW">South Korean Won (₩)</option><option value="MXN">Mexican Peso ($)</option><option value="NOK">Norwegian Krone (kr)</option><option value="PLN">Polish Zloty (zł)</option><option value="RON">Romanian Leu (lei)</option><option value="RSD">Serbian Dinar (дин)</option><option value="SEK">Swedish Krona (kr)</option><option value="THB">Thai Baht (฿)</option><option value="USD">US Dollar ($)</option>
+    </datalist>
+    <script>
+        const DB_KEY = 'shai_maestro_merch_v11';
+        
+        // Suitcase capacity limits
+        const SUITCASE_LIMITS = {
+            vinyl: 40,  // Total vinyls (Guesthouse + Miniatures combined)
+            cd: 100     // Total CDs (Guesthouse + Miniatures combined)
+        };
+        
+        const ITEMS = [
+            { id: 'guest_vinyl', label: 'GUESTHOUSE VINYL', icon: 'fa-record-vinyl', type: 'vinyl', color: 'text-indigo-400', bg: 'bg-indigo-400/10', border: 'border-indigo-500/30', lowThreshold: 60 },
+            { id: 'guest_cd', label: 'GUESTHOUSE CD', icon: 'fa-compact-disc', type: 'cd', color: 'text-cyan-300', bg: 'bg-cyan-300/10', border: 'border-cyan-400/30', lowThreshold: 60 },
+            { id: 'mini_vinyl', label: 'MINIATURES VINYL', icon: 'fa-record-vinyl', type: 'vinyl', color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-500/30', lowThreshold: 60 },
+            { id: 'mini_cd', label: 'MINIATURES CD', icon: 'fa-compact-disc', type: 'cd', color: 'text-sky-300', bg: 'bg-sky-300/10', border: 'border-sky-400/30', lowThreshold: 60 },
+            { id: 'postcards', label: 'POSTCARDS', icon: 'fa-image', type: 'merch', color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-500/30', lowThreshold: 100 },
+            { id: 'poster', label: 'POSTERS', icon: 'fa-scroll', type: 'merch', color: 'text-teal-400', bg: 'bg-teal-400/10', border: 'border-teal-500/30', lowThreshold: 30 },
+            { id: 'tote', label: 'TOTE BAGS', icon: 'fa-shopping-bag', type: 'merch', color: 'text-green-400', bg: 'bg-green-400/10', border: 'border-green-500/30', lowThreshold: 30 }
+        ];
+        const TOUR_COLORS = [{ name: 'Purple', bg: 'bg-purple-900/40', border: 'border-purple-500', text: 'text-purple-400', line: 'bg-purple-500' }, { name: 'Blue', bg: 'bg-blue-900/40', border: 'border-blue-500', text: 'text-blue-400', line: 'bg-blue-500' }, { name: 'Emerald', bg: 'bg-emerald-900/40', border: 'border-emerald-500', text: 'text-emerald-400', line: 'bg-emerald-500' }, { name: 'Amber', bg: 'bg-amber-900/40', border: 'border-amber-500', text: 'text-amber-400', line: 'bg-amber-500' }, { name: 'Pink', bg: 'bg-pink-900/40', border: 'border-pink-500', text: 'text-pink-400', line: 'bg-pink-500' }, { name: 'Cyan', bg: 'bg-cyan-900/40', border: 'border-cyan-500', text: 'text-cyan-400', line: 'bg-cyan-500' }];
+        let state = { shows: [], shipments: [], transfers: [], inventory: {}, settings: { designerPercent: 10, email: '', lastPrices: {}, notifiedLowStock: {} }, ui: { masterStockCollapsed: true, selectedOverviewTour: 'CURRENT', collapsedTours: {} }, vendorSession: { active: false, stock: {}, prices: {}, sales: [], meta: {} } };
+        let tempShipmentItems = [], editingShipmentId = null, editingShowId = null, lastUndoAction = null, pendingVendorData = null, eurRates = { EUR: 1, USD: 1.1, GBP: 0.85, ILS: 4.0, CZK: 25.0, PLN: 4.3, AUD: 1.6, BRL: 5.5, CAD: 1.5, CLP: 980, CNY: 7.8, DKK: 7.5, GEL: 2.9, HKD: 8.5, HUF: 390, ISK: 150, INR: 90, JPY: 160, KRW: 1450, MXN: 19, NOK: 11.5, RON: 5.0, RSD: 117, SEK: 11.3, CHF: 0.95, THB: 39 };
+        let lastLabelSelection = ITEMS[0].id;
+
+        const loadData = () => {
+            const saved = localStorage.getItem(DB_KEY);
+            if (saved) { try { const parsed = JSON.parse(saved); state = { ...state, ...parsed }; if (!state.vendorSession.meta) state.vendorSession.meta = {}; if (!state.ui.collapsedTours) state.ui.collapsedTours={}; } catch(e) {} }
+            ITEMS.forEach(item => { if (state.inventory[item.id] === undefined) state.inventory[item.id] = 0; });
+            fetch('https://api.exchangerate-api.com/v4/latest/EUR').then(res => res.json()).then(data => { eurRates = data.rates; window.renderDashboard(); }).catch(e => {});
+            if ("Notification" in window) Notification.requestPermission();
+        };
+        const saveData = () => { localStorage.setItem(DB_KEY, JSON.stringify(state)); checkLowStock(); };
+        const checkLowStock = () => { /* Logic */ };
+        const showToast = (msg, icon='fa-check-circle') => { const t = document.getElementById('toast'); document.getElementById('toastMsg').innerText = msg; document.getElementById('toastIcon').className = `fas ${icon} text-xl`; t.className = "show"; setTimeout(() => t.className = "", 4000); };
+        const setUndo = (type, data, msg="Action Saved") => { lastUndoAction = { type, data }; showToast(msg); };
+        const handleUndo = () => { if(!lastUndoAction) return; if(lastUndoAction.type==='add_show') state.shows.pop(); else if(lastUndoAction.type==='add_shipment') state.shipments.pop(); else if(lastUndoAction.type==='transfer') state.transfers.pop(); saveData(); location.reload(); };
+        const getStockLevels = (itemId) => { let home = state.inventory[itemId] || 0, tour = 0; state.shipments.forEach(s => s.items.forEach(i => { if (i.itemId === itemId) home += (parseInt(i.qty)||0); })); state.transfers.forEach(t => { const qty = t.items[itemId]||0; if (t.type === 'TO_TOUR') { home -= qty; tour += qty; } else if (t.type === 'TO_HOME') { tour -= qty; home += qty; } }); state.shows.forEach(s => { if (s.sales?.[itemId]) tour -= (parseInt(s.sales[itemId].qty)||0); if (s.freebies?.[itemId]) tour -= (parseInt(s.freebies[itemId])||0); }); return { home, tour }; };
+        const getItem = (id) => ITEMS.find(i => i.id === id) || {};
+        
+        // Get current tour stock totals by type
+        const getTourCapacity = () => {
+            let vinylOnTour = 0, cdOnTour = 0;
+            ITEMS.forEach(item => {
+                const levels = getStockLevels(item.id);
+                if (item.type === 'vinyl') vinylOnTour += levels.tour;
+                else if (item.type === 'cd') cdOnTour += levels.tour;
+            });
+            return { 
+                vinyl: vinylOnTour, 
+                cd: cdOnTour, 
+                vinylMax: SUITCASE_LIMITS.vinyl, 
+                cdMax: SUITCASE_LIMITS.cd,
+                vinylPct: Math.min(100, Math.round((vinylOnTour / SUITCASE_LIMITS.vinyl) * 100)),
+                cdPct: Math.min(100, Math.round((cdOnTour / SUITCASE_LIMITS.cd) * 100)),
+                vinylOver: vinylOnTour > SUITCASE_LIMITS.vinyl,
+                cdOver: cdOnTour > SUITCASE_LIMITS.cd
+            };
+        };
+
+        window.renderDashboard = () => {
+            const container = document.getElementById('view-dashboard');
+            const uniqueTours = [...new Set(state.shows.map(s => s.tour).filter(Boolean))].reverse();
+            const selectedTour = state.ui.selectedOverviewTour === 'CURRENT' ? (uniqueTours[0] || "") : state.ui.selectedOverviewTour;
+            let yearly = { net: 0, cash: 0, card: 0, paypal: 0, shani: 0 }, tour = { net: 0, cash: 0, card: 0, paypal: 0, shani: 0 }, totalExpenses = 0;
+            state.shows.forEach(show => {
+                const rate = show.currency === 'EUR' ? 1 : (eurRates[show.currency] ? (1/eurRates[show.currency]) : 1);
+                let showGross = 0, merchGross = 0;
+                ITEMS.forEach(item => { const sale = show.sales?.[item.id]; if(sale && sale.qty > 0) { const amt = sale.qty*sale.price; showGross+=amt; if(item.type==='merch') merchGross+=amt; }});
+                const venueCut = showGross * ((show.venuePercent||0)/100);
+                const merchNet = merchGross * (1 - ((show.venuePercent||0)/100)); 
+                const designerCut = merchNet * ((state.settings.designerPercent||0)/100);
+                const net = showGross - venueCut - designerCut;
+                const netEur = net * rate; const designerEur = designerCut * rate;
+                yearly.net += netEur; yearly.shani += designerEur;
+                const pm = show.paymentMethods || { cash: net, card: 0, paypal: 0 };
+                const collectedTotal = (pm.cash + pm.card + pm.paypal) || net; 
+                const scale = collectedTotal > 0 ? (net / collectedTotal) : 0; 
+                const cEur = (pm.cash * scale) * rate; const ccEur = (pm.card * scale) * rate; const ppEur = (pm.paypal * scale) * rate;
+                yearly.cash += cEur; yearly.card += ccEur; yearly.paypal += ppEur;
+                if (show.tour === selectedTour) { tour.net += netEur; tour.shani += designerEur; tour.cash += cEur; tour.card += ccEur; tour.paypal += ppEur; }
+            });
+            state.shipments.forEach(s => { let c = parseFloat(s.shipping)||0; s.items.forEach(i=>c+=(i.qty*i.cost)); totalExpenses += c; });
+            yearly.net -= totalExpenses;
+            const getBreakdownHtml = (obj) => `<div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-2 bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/50"><div><span class="text-green-400">Cash:</span> €${Math.round(obj.cash).toLocaleString()}</div><div><span class="text-blue-400">Card:</span> €${Math.round(obj.card).toLocaleString()}</div><div><span class="text-indigo-400">PP:</span> €${Math.round(obj.paypal).toLocaleString()}</div></div>`;
+            const groupedShows = []; let currentGroup = null;
+            [...state.shows].reverse().forEach(show => { const tourName = show.tour || "Individual Gig"; if (!currentGroup || currentGroup.tourName !== tourName || tourName === "Individual Gig") { currentGroup = { tourName: tourName, shows: [] }; groupedShows.push(currentGroup); } currentGroup.shows.push(show); });
+            const activityHtml = groupedShows.map((group, groupIdx) => {
+                const isIndiv = group.tourName === "Individual Gig";
+                const colorIdx = group.tourName.split('').reduce((a,b)=>a+b.charCodeAt(0),0) % TOUR_COLORS.length;
+                const theme = isIndiv ? { border: 'border-slate-700', text: 'text-slate-400', bg: 'bg-slate-800', line: 'hidden' } : TOUR_COLORS[colorIdx];
+                if (isIndiv) { const s = group.shows[0]; return `<div onclick="openGigModal(${s.id})" class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center active:scale-95 transition-transform cursor-pointer hover:border-blue-500/50 group shadow-lg mb-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-400">${s.city.substring(0,2).toUpperCase()}</div><div class="text-left"><h3 class="font-bold text-white text-base leading-none mb-1">${s.city}</h3><p class="text-xs text-slate-400 font-bold">${s.venue}</p></div></div><div class="text-right"><span class="block text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded-full mb-1 inline-block">Single Gig</span><span class="block text-[10px] text-slate-500 font-mono font-bold">${s.date}</span></div></div>`; } 
+                else {
+                    const isCollapsed = state.ui.collapsedTours[group.tourName];
+                    let tourTotalNet = 0;
+                    group.shows.forEach(s => { let g=0, m=0; ITEMS.forEach(i=>{ const x=s.sales?.[i.id]; if(x){const a=x.qty*x.price; g+=a; if(i.type==='merch')m+=a;} }); const n = g - (g*(s.venuePercent||0)/100) - (m*(1-(s.venuePercent||0)/100)*((state.settings.designerPercent||0)/100)); tourTotalNet += n * (s.currency==='EUR'?1:(eurRates[s.currency]?(1/eurRates[s.currency]):1)); });
+                    const headerHtml = `<div onclick="toggleTourCollapse('${group.tourName}')" class="tour-header relative z-20 ${theme.bg} border-l-4 ${theme.border} p-3 rounded-r-xl mb-2 flex justify-between items-center shadow-md"><div><h3 class="text-xs font-black uppercase ${theme.text} tracking-widest flex items-center gap-2"><i class="fas ${isCollapsed ? 'fa-chevron-right' : 'fa-chevron-down'}"></i> ${group.tourName}</h3><p class="text-[9px] text-slate-300 font-bold mt-1">${group.shows.length} Gigs • ${group.shows[group.shows.length-1].date} - ${group.shows[0].date}</p></div><div class="text-right"><span class="block text-sm font-extrabold text-white">€${Math.round(tourTotalNet).toLocaleString()}</span><span class="text-[9px] text-slate-400 uppercase font-bold">Total Net</span></div></div>`;
+                    if (isCollapsed) return headerHtml;
+                    const gigsHtml = group.shows.map((show, idx) => { const isLast = idx === group.shows.length - 1; return `<div class="relative pl-6 mb-2"><div class="absolute left-2.5 top-0 bottom-0 w-0.5 ${theme.line} opacity-40 ${isLast ? 'h-1/2' : ''}"></div><div onclick="openGigModal(${show.id})" class="bg-slate-800 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center active:scale-95 transition-transform cursor-pointer relative z-10 hover:border-slate-500"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full ${theme.bg} flex items-center justify-center font-bold text-[10px] ${theme.text} border ${theme.border}">${show.city.substring(0,2).toUpperCase()}</div><div><h4 class="font-bold text-white text-sm">${show.city}</h4><p class="text-[10px] text-slate-400">${show.venue}</p></div></div><div class="text-right"><span class="text-[10px] font-mono font-bold text-slate-500">${show.date}</span></div></div></div>`; }).join('');
+                    return `<div class="mb-4">${headerHtml}<div class="mt-1">${gigsHtml}</div></div>`;
+                }
+            }).join('');
+            container.innerHTML = `<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-4xl font-black text-white tracking-tighter mb-2 text-center">Overview</h2><div class="w-full card-modern bg-gradient-to-br from-indigo-900 to-slate-900 border-l-4 border-indigo-500 text-center"><div class="flex justify-between items-center mb-2"><h2 class="text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2"><i class="fas fa-route"></i> Tour Net Profit</h2><select onchange="updateOverviewTour(this.value)" class="bg-slate-900 text-[10px] text-white border border-slate-700 rounded px-2 py-1 font-bold uppercase outline-none focus:border-indigo-500">${uniqueTours.length === 0 ? '<option>No Tours</option>' : ''}${uniqueTours.map(t => `<option value="${t}" ${t === selectedTour ? 'selected' : ''}>${t}</option>`).join('')}</select></div><div class="flex flex-col items-center"><span class="text-5xl font-extrabold text-white tracking-tight">€${tour.net.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Net (${selectedTour || 'N/A'})</span><div class="mt-1 text-[10px] text-slate-500 font-bold">* After Shani's ${state.settings.designerPercent}% cut -> €${Math.round(tour.shani).toLocaleString()}</div>${getBreakdownHtml(tour)}</div></div><div class="w-full card-modern bg-gradient-to-br from-slate-800 to-slate-900 border-l-4 border-l-green-500 text-center"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i class="fas fa-globe-europe text-green-500"></i> Yearly Net Profit</h2><div class="flex flex-col items-center"><span class="text-4xl font-extrabold text-white tracking-tight">€${yearly.net.toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Grand Total (EUR)</span><div class="mt-1 text-[10px] text-slate-500 font-bold">* After Shani's ${state.settings.designerPercent}% cut -> €${Math.round(yearly.shani).toLocaleString()}</div>${getBreakdownHtml(yearly)}</div></div><div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 text-center">Recent Activity</h2><div class="space-y-1">${activityHtml}</div></div></div>`;
+        };
+
+        window.renderVendor = () => {
+             const container = document.getElementById('view-vendor');
+             if (!state.vendorSession.active) {
+                 container.innerHTML = `<div class="space-y-8 pb-24 flex flex-col items-center justify-center min-h-[60vh]"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">Vendor Mode</h2><div class="w-full space-y-6"><button onclick="renderVendorSetup()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black py-8 px-6 rounded-3xl shadow-2xl transform transition-all active:scale-95 text-xl tracking-wide border-t border-blue-400/20 flex flex-col items-center gap-2"><i class="fas fa-plus-circle text-4xl mb-1"></i>Setup New Sale</button><button onclick="alert('No active session.')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold py-6 px-6 rounded-3xl border border-slate-700 transform transition-all active:scale-95 text-lg flex flex-col items-center gap-2"><i class="fas fa-edit text-2xl mb-1"></i>Edit Existing Sale</button></div></div>`;
+                 return;
+             }
+             const sales = state.vendorSession.sales, currency = state.vendorSession.meta.currency || 'EUR', venueCutPct = state.vendorSession.meta.venuePercent || 0;
+             const cash = sales.filter(s=>s.method==='Cash').reduce((a,b)=>a+b.price,0), card = sales.filter(s=>s.method==='Card').reduce((a,b)=>a+b.price,0), pp = sales.filter(s=>s.method==='PayPal').reduce((a,b)=>a+b.price,0);
+             const gross = cash + card + pp, venueCutAmt = gross * (venueCutPct / 100), net = gross - venueCutAmt, counts = {}; sales.forEach(s => counts[s.itemId] = (counts[s.itemId] || 0) + 1);
+             container.innerHTML = `<div class="space-y-4 pb-32"><div class="flex justify-between items-center px-1 mb-2"><div><h2 class="text-2xl font-extrabold text-white tracking-tight">Active Sale</h2><p class="text-[10px] text-slate-400 font-bold uppercase">${state.vendorSession.meta.venue}, ${state.vendorSession.meta.city}</p></div><button onclick="undoVendorSale()" class="bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 hover:bg-slate-600 active:scale-95 shadow-lg"><i class="fas fa-undo mr-1"></i> Undo</button></div><div class="grid grid-cols-2 gap-3 z-0 relative">${ITEMS.map(item => { const sold = counts[item.id] || 0, initial = state.vendorSession.stock[item.id] || 0, price = state.vendorSession.prices[item.id] || 0; return `<button onclick="promptPaymentMethod('${item.id}', ${price}, '${currency}')" class="btn-vendor ${item.bg} border-2 ${item.border} relative z-0"><div class="text-3xl mb-1 ${item.color} drop-shadow-lg"><i class="fas ${item.icon}"></i></div><div class="text-xs font-bold text-white leading-tight px-1 text-center mb-1 h-8 flex items-center justify-center">${item.label}</div><div class="text-3xl font-black text-white drop-shadow-md">${sold}<span class="text-lg text-slate-400">/${initial}</span></div><div class="absolute top-2 right-2 text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white border border-white/10">${price}</div></button>`}).join('')}</div><div class="fixed bottom-24 left-0 w-full px-4 z-40"><div class="max-w-lg mx-auto bg-slate-900/95 backdrop-blur-xl border border-slate-600/50 rounded-3xl p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"><div class="grid grid-cols-3 gap-2 mb-4 text-center"><div class="bg-green-900/30 p-2 rounded-xl border border-green-500/20"><div class="text-[9px] text-green-400 uppercase font-bold mb-1">Cash</div><div class="text-xs font-bold text-white">${cash} <span class="text-[9px] text-slate-400">${currency}</span></div></div><div class="bg-blue-900/30 p-2 rounded-xl border border-blue-500/20"><div class="text-[9px] text-blue-400 uppercase font-bold mb-1">Card</div><div class="text-xs font-bold text-white">${card} <span class="text-[9px] text-slate-400">${currency}</span></div></div><div class="bg-indigo-900/30 p-2 rounded-xl border border-indigo-500/20"><div class="text-[9px] text-indigo-400 uppercase font-bold mb-1">PayPal</div><div class="text-xs font-bold text-white">${pp} <span class="text-[9px] text-slate-400">${currency}</span></div></div></div><div class="flex justify-between items-end mb-4 px-2 text-xs font-bold text-slate-400"><div>Gross: <span class="text-white">${gross}</span></div><div>Venue (${venueCutPct}%): <span class="text-red-400">-${venueCutAmt.toFixed(0)}</span></div><div>Net: <span class="text-emerald-400 text-xl">${net.toFixed(0)}</span></div></div><button onclick="finishVendorSession()" class="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white font-black py-4 rounded-2xl shadow-lg transform transition-all active:scale-95 text-xl tracking-wide uppercase flex items-center justify-center gap-2 border-t border-red-400/30"><i class="fas fa-flag-checkered"></i> FINISH SALE</button></div></div></div>`;
+        };
+
+        window.renderVendorSetup = () => {
+            const container = document.getElementById('view-vendor');
+            container.innerHTML = `<div class="space-y-6 pb-24 flex flex-col items-center animate-pop"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">New Sale Setup</h2><div class="w-full card-modern"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Event Details</h3><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Date</label><input type="date" id="v_setup_date" class="input-modern text-xs" value="${new Date().toISOString().split('T')[0]}"></div><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">City</label><input type="text" id="v_setup_city" class="input-modern text-xs"></div></div><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Venue</label><input type="text" id="v_setup_venue" class="input-modern text-xs"></div><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Currency</label><input list="currency-list" id="v_setup_currency" class="input-modern text-xs uppercase" placeholder="EUR" oninput="updateSetupCurrencyLabels(this.value)"></div></div><div class="mb-6"><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Venue Cut %</label><input type="number" id="v_setup_venue_percent" class="input-modern text-xs" placeholder="0"></div><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Stock & Prices</h3><div class="space-y-3">${ITEMS.map(item => `<div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center"><i class="fas ${item.icon} ${item.color}"></i></div><span class="font-bold text-xs text-white w-24 leading-tight">${item.label}</span></div><div class="flex gap-2"><input type="number" id="v_setup_qty_${item.id}" placeholder="Given" class="input-modern py-1 text-center text-xs w-16" onfocus="this.placeholder=''"><div class="relative"><input type="number" id="v_setup_price_${item.id}" placeholder="Price" class="input-modern py-1 pl-2 pr-8 text-center text-xs w-20 font-bold text-blue-600" value="${state.settings.lastPrices[item.id] || ''}"><span class="v-currency-label absolute right-2 top-1.5 text-[9px] text-slate-400 font-bold pointer-events-none">EUR</span></div></div></div>`).join('')}</div><button onclick="startVendorSession()" class="btn-fun mt-8 w-full py-5 text-xl shadow-2xl">Start Sale 🚀</button></div></div>`;
+        };
+
+        window.updateSetupCurrencyLabels = (val) => { const label = val.toUpperCase() || 'EUR'; document.querySelectorAll('.v-currency-label').forEach(el => el.innerText = label); };
+        window.startVendorSession = () => { const date = document.getElementById('v_setup_date').value; const city = document.getElementById('v_setup_city').value; const venue = document.getElementById('v_setup_venue').value; const currency = document.getElementById('v_setup_currency').value.toUpperCase() || 'EUR'; const venuePercent = parseFloat(document.getElementById('v_setup_venue_percent').value) || 0; if(!city || !venue) return alert("Please enter City and Venue"); const stock = {}, prices = {}; ITEMS.forEach(item => { stock[item.id] = parseInt(document.getElementById(`v_setup_qty_${item.id}`).value) || 0; prices[item.id] = parseFloat(document.getElementById(`v_setup_price_${item.id}`).value) || 0; }); state.vendorSession = { active: true, stock, prices, sales: [], meta: { date, city, venue, currency, venuePercent } }; saveData(); window.renderVendor(); };
+        
+        window.promptPaymentMethod = (itemId, price, currency) => {
+            if(!price || price === 0) { const newPrice = prompt("Enter Price for this item:"); if(!newPrice) return; price = parseFloat(newPrice); state.vendorSession.prices[itemId] = price; saveData(); }
+            const item = getItem(itemId); const body = document.getElementById('modalBody'); const footer = document.getElementById('modalFooter'); document.getElementById('modalTitle').innerText = `Sold: ${item.label}`;
+            body.innerHTML = `<div class="grid grid-cols-1 gap-3"><button onclick="recordVendorSale('${itemId}', ${price}, 'Cash')" class="bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl text-lg shadow-lg flex justify-between px-6 items-center"><span><i class="fas fa-money-bill-wave mr-2"></i> Cash</span> <span>${price} ${currency}</span></button><button onclick="recordVendorSale('${itemId}', ${price}, 'Card')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl text-lg shadow-lg flex justify-between px-6 items-center"><span><i class="fas fa-credit-card mr-2"></i> Card</span> <span>${price} ${currency}</span></button><button onclick="recordVendorSale('${itemId}', ${price}, 'PayPal')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl text-lg shadow-lg flex justify-between px-6 items-center"><span><i class="fab fa-paypal mr-2"></i> PayPal</span> <span>${price} ${currency}</span></button></div>`;
+            footer.innerHTML = `<button onclick="closeModal()" class="w-full py-3 text-slate-400 font-bold uppercase tracking-widest hover:text-white">Cancel</button>`;
+            document.getElementById('modalOverlay').classList.remove('hidden'); setTimeout(() => document.getElementById('modalContent').classList.remove('opacity-0', 'scale-95'), 10);
+        };
+
+        window.recordVendorSale = (itemId, price, method) => { closeModal(); state.vendorSession.sales.push({ timestamp: Date.now(), itemId, price, method }); saveData(); window.renderVendor(); showToast(`${method} Sale Recorded`, 'fa-dollar-sign'); };
+        window.undoVendorSale = () => { if (state.vendorSession.sales.length === 0) return showToast("Nothing to undo", "fa-ban"); state.vendorSession.sales.pop(); saveData(); window.renderVendor(); showToast("Last sale undone", "fa-undo"); };
+        window.finishVendorSession = () => { const sales = state.vendorSession.sales; const aggregated = {}; let cash=0, card=0, paypal=0; sales.forEach(s => { if(s.method==='Cash') cash+=s.price; else if(s.method==='Card') card+=s.price; else paypal+=s.price; aggregated[s.itemId] = (aggregated[s.itemId] || {qty:0, price:state.vendorSession.prices[s.itemId]}); aggregated[s.itemId].qty++; }); pendingVendorData = { meta: state.vendorSession.meta, sales: aggregated, payments: { cash, card, paypal } }; state.vendorSession = { active: false, stock: {}, prices: {}, sales: [], meta: {} }; saveData(); editingShowId = null; router('add-show'); setTimeout(() => alert("Vendor Sale Finished! Data transferred to Gig Log. Please review and Save."), 300); };
+        
+        window.renderAddShow = () => {
+             const container = document.getElementById('view-add-show');
+             const uniqueTours = [...new Set(state.shows.map(s => s.tour).filter(Boolean))].reverse();
+             let editShow = null; if(editingShowId) editShow = state.shows.find(s => s.id === editingShowId);
+             let defaultCity = '', defaultVenue = '', defaultDate = new Date().toISOString().split('T')[0], defaultCurrency = 'EUR', defaultVenuePct = ''; let pCash = '', pCard = '', pPaypal = '';
+             if (pendingVendorData) { defaultCity = pendingVendorData.meta.city; defaultVenue = pendingVendorData.meta.venue; defaultDate = pendingVendorData.meta.date; defaultCurrency = pendingVendorData.meta.currency; defaultVenuePct = pendingVendorData.meta.venuePercent; pCash = pendingVendorData.payments.cash; pCard = pendingVendorData.payments.card; pPaypal = pendingVendorData.payments.paypal; } else if (editShow) { defaultCity = editShow.city; defaultVenue = editShow.venue; defaultDate = editShow.date; defaultCurrency = editShow.currency; defaultVenuePct = editShow.venuePercent; if(editShow.paymentMethods) { pCash=editShow.paymentMethods.cash; pCard=editShow.paymentMethods.card; pPaypal=editShow.paymentMethods.paypal; } }
+             container.innerHTML = `<div class="space-y-6 pb-20"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">${editingShowId ? 'Edit Gig' : 'Log Gig'}</h2><form id="showForm" onsubmit="submitShow(event)" class="space-y-6"><div class="card-modern transition-colors duration-500" id="logDetailsCard"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Details</h3><div id="tourNameBanner" class="${editShow ? '' : 'hidden'} mb-4 bg-indigo-500/20 border border-indigo-500/50 p-2 rounded-lg text-center"><span class="text-indigo-300 font-bold text-sm tracking-wide" id="tourNameDisplay">${editShow ? editShow.tour : ''}</span></div><div class="mb-6"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Tour</label><div class="flex flex-col gap-3"><select id="tourSelect" onchange="handleTourSelect(this)" class="input-modern"><option value="">Individual Gig</option>${uniqueTours.map(t => `<option value="${t}" ${editShow && editShow.tour === t ? 'selected' : ''}>${t}</option>`).join('')}<option value="NEW" class="text-blue-600 font-bold">+ Create New Tour</option></select><input type="text" id="newTourInput" name="newTour" placeholder="Enter New Tour Name" class="input-modern hidden animate-pop border-blue-500"></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">City</label><input type="text" name="city" required class="input-modern" value="${defaultCity}"></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue</label><input type="text" name="venue" required class="input-modern" value="${defaultVenue}"></div></div><div class="mt-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" name="date" required class="input-modern" value="${defaultDate}"></div></div><div class="card-modern border-l-4 border-yellow-500"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Financials</h3><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Currency</label><input list="currency-list" name="currency" id="gigCurrency" placeholder="EUR" value="${defaultCurrency}" class="input-modern uppercase" onfocus="this.value=''" onblur="if(this.value=='')this.value='EUR'" oninput="updateCurrencyLabels(this.value)"></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue Cut</label><div class="relative w-full"><input type="number" name="venuePercent" placeholder="0" class="input-modern pr-8" min="0" max="100" value="${defaultVenuePct}"><span class="input-group-text-overlay">%</span></div></div></div><div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50"><label class="text-xs text-slate-400 font-bold uppercase mb-2 block">Payment Totals (Collected)</label><div class="grid grid-cols-3 gap-2"><div><label class="text-[9px] text-green-400 font-bold block mb-1">Cash</label><input type="number" name="pay_cash" placeholder="0" value="${pCash}" class="input-modern text-xs text-center px-1"></div><div><label class="text-[9px] text-blue-400 font-bold block mb-1">Card</label><input type="number" name="pay_card" placeholder="0" value="${pCard}" class="input-modern text-xs text-center px-1"></div><div><label class="text-[9px] text-indigo-400 font-bold block mb-1">PayPal</label><input type="number" name="pay_paypal" placeholder="0" value="${pPaypal}" class="input-modern text-xs text-center px-1"></div></div></div></div><div class="card-modern"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Sales (Review)</h3><div class="space-y-1">${ITEMS.map(item => { let qty = '', price = ''; if (editShow && editShow.sales[item.id]) { qty = editShow.sales[item.id].qty; price = editShow.sales[item.id].price; } else if (pendingVendorData && pendingVendorData.sales[item.id]) { qty = pendingVendorData.sales[item.id].qty; price = pendingVendorData.sales[item.id].price; } return `<div class="flex items-center gap-3 py-3 border-b border-slate-700/50 last:border-0"><div class="w-8 flex justify-center"><i class="fas ${item.icon} ${item.color} text-lg"></i></div><div class="flex-1"><p class="text-sm text-slate-200 font-bold mb-1">${item.label}</p><div class="flex gap-3"><input type="number" name="qty_${item.id}" placeholder="Qty" value="${qty}" class="input-modern py-2 text-center w-24 font-extrabold text-black" min="0"><div class="relative flex-1"><span class="currency-label absolute left-3 top-2.5 text-slate-400 text-xs font-bold">€</span><input type="number" step="0.01" name="price_${item.id}" placeholder="Price" value="${price}" class="input-modern py-2 pl-6 text-sm text-black" min="0"></div></div></div></div>`}).join('')}</div></div><div class="card-modern border-l-4 border-pink-500"><h3 class="text-xs font-bold text-pink-500 uppercase tracking-widest mb-4"><i class="fas fa-gift mr-1"></i> Freebies</h3><div class="space-y-2">${ITEMS.map(item => `<div class="flex justify-between items-center"><label class="text-xs text-slate-300 font-bold w-1/2">${item.label}</label><input type="number" name="free_${item.id}" value="${editShow && editShow.freebies[item.id] ? editShow.freebies[item.id] : ''}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black" min="0"></div>`).join('')}</div></div><div class="pt-2 text-center"><button type="submit" class="btn-save-gig" id="saveShowBtn"><span>${editShow ? 'Update Log' : 'Save Show Log'}</span> <i class="fas fa-arrow-right"></i></button></div></form></div>`;
+             if(editShow) handleTourSelect(document.getElementById('tourSelect'));
+        };
+
+        window.renderLabel = () => {
+             const container = document.getElementById('view-label');
+             const tempItemsHtml = tempShipmentItems.map((item, idx) => { const iData = getItem(item.itemId); return `<div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl mb-2 border border-slate-600"><span class="text-sm font-bold text-white">${iData.label} <span class="text-blue-300">x${item.qty}</span></span><div class="flex items-center gap-2"><span class="text-xs text-slate-400">€${item.cost}/u</span><button onclick="removeTempItem(${idx})" class="text-red-400 hover:text-red-300 bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button></div></div>`; }).join('');
+             const isEditing = editingShipmentId !== null;
+             container.innerHTML = `
+                <div class="space-y-6 pb-20 flex flex-col items-center">
+                    <h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">Label</h2>
+                    <div id="shipmentFormContainer" class="w-full max-w-md card-modern border-t-4 border-indigo-500">
+                        <h3 id="shipmentFormTitle" class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 text-center">${isEditing ? 'Edit Shipment' : 'Log Shipment from Naive'}</h3>
+                        <div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" id="shp_date" class="input-modern text-sm" value="${new Date().toISOString().split('T')[0]}"></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Invoice #</label><input type="text" id="shp_invoice" class="input-modern text-sm"></div></div>
+                        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700 mb-4"><label class="text-xs text-slate-400 font-bold uppercase mb-2 block text-center">Add Items</label><div class="flex gap-2 mb-2"><select id="shp_temp_itemId" class="input-modern text-sm py-2 flex-grow">${ITEMS.map(i => `<option value="${i.id}" ${i.id === lastLabelSelection ? 'selected' : ''}>${i.label}</option>`).join('')}</select><input type="number" id="shp_temp_qty" placeholder="Qty" class="input-modern text-sm py-2 w-20 text-center"></div><div class="flex gap-2 items-center"><input type="number" id="shp_temp_cost" placeholder="Cost/Unit (€)" class="input-modern text-sm py-2 flex-grow"><button onclick="addTempItem()" class="bg-indigo-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold shadow-lg text-lg hover:bg-indigo-500 transition-colors">+</button></div></div>
+                        <div class="mb-4">${tempItemsHtml}</div>
+                        <div class="mb-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Shipping (€)</label><input type="number" id="shp_shipping" placeholder="0.00" class="input-modern font-bold"></div>
+                        <div class="bg-slate-700/30 p-3 rounded-xl border border-slate-600/50 flex justify-between items-center mb-6"><div class="flex items-center gap-3"><input type="checkbox" id="shp_paid" onchange="togglePaidDate(this.checked)" class="w-6 h-6 rounded border-slate-500 text-indigo-500 bg-white"><label for="shp_paid" class="text-sm font-bold text-slate-300">Paid?</label></div><input type="date" id="shp_paidDate" class="input-modern text-sm w-32 hidden"></div>
+                        <div class="text-center"><button onclick="saveShipment()" id="shp_submitBtn" class="btn-fun shadow-indigo-900/40 text-lg w-full"><i class="fas fa-save"></i> <span>${isEditing ? 'Update Shipment' : 'Save Shipment'}</span></button><button type="button" id="shp_cancelBtn" onclick="resetShipmentForm()" class="${isEditing ? '' : 'hidden'} w-full text-xs text-slate-500 mt-3 underline font-bold">Cancel Edit</button></div>
+                    </div>
+                    <div class="w-full"><h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">History</h3><div class="space-y-2">${state.shipments.slice().reverse().map(s => { let total = parseFloat(s.shipping) || 0; s.items.forEach(i => total += (i.qty * i.cost)); return `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700 relative group active:scale-95 transition-transform"><div class="flex justify-between items-start cursor-pointer" onclick="openShipmentModal(${s.id})"><div><p class="text-white font-bold text-sm">Invoice: ${s.invoice}</p><p class="text-xs text-slate-500 font-bold">${s.date} • ${s.items.length} Items</p></div><div class="text-right"><p class="text-red-400 font-mono font-bold text-sm">-€${total.toFixed(2)}</p><div class="mt-1">${s.paid ? `<i class="fas fa-check-circle text-green-500 text-sm"></i>` : `<span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30 font-bold">UNPAID</span>`}</div></div></div></div>`}).join('')}</div></div>
+                </div>`;
+             document.getElementById('shp_temp_cost').addEventListener('keypress', function (e) { if (e.key === 'Enter') addTempItem(); });
+             if(isEditing) { const s = state.shipments.find(x => x.id === editingShipmentId); if(s) { document.getElementById('shp_date').value = s.date; document.getElementById('shp_invoice').value = s.invoice; document.getElementById('shp_shipping').value = s.shipping; document.getElementById('shp_paid').checked = s.paid; togglePaidDate(s.paid); if(s.paid) document.getElementById('shp_paidDate').value = s.paidDate; } }
+        };
+
+        window.renderTourStock = () => {
+             const container = document.getElementById('view-tour-stock');
+             const cap = getTourCapacity();
+             const vinylBarColor = cap.vinylOver ? 'bg-red-500' : cap.vinylPct > 80 ? 'bg-amber-500' : 'bg-indigo-500';
+             const cdBarColor = cap.cdOver ? 'bg-red-500' : cap.cdPct > 80 ? 'bg-amber-500' : 'bg-cyan-400';
+             
+             const capacityHtml = `
+                <div class="w-full card-modern bg-gradient-to-br from-amber-900/20 to-slate-800 border-l-4 border-amber-500">
+                    <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-suitcase-rolling"></i> Suitcase Capacity</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-indigo-300 flex items-center gap-1"><i class="fas fa-record-vinyl text-[10px]"></i> Vinyl</span>
+                                <span class="text-xs font-extrabold ${cap.vinylOver ? 'text-red-400 animate-pulse' : 'text-white'}">${cap.vinyl} / ${cap.vinylMax}</span>
+                            </div>
+                            <div class="capacity-bar">
+                                <div class="capacity-fill ${vinylBarColor}" style="width: ${Math.min(100, cap.vinylPct)}%"></div>
+                            </div>
+                            ${cap.vinylOver ? '<p class="text-[10px] text-red-400 font-bold mt-1 animate-pulse">OVER CAPACITY by ' + (cap.vinyl - cap.vinylMax) + '!</p>' : ''}
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-xs font-bold text-cyan-300 flex items-center gap-1"><i class="fas fa-compact-disc text-[10px]"></i> CD</span>
+                                <span class="text-xs font-extrabold ${cap.cdOver ? 'text-red-400 animate-pulse' : 'text-white'}">${cap.cd} / ${cap.cdMax}</span>
+                            </div>
+                            <div class="capacity-bar">
+                                <div class="capacity-fill ${cdBarColor}" style="width: ${Math.min(100, cap.cdPct)}%"></div>
+                            </div>
+                            ${cap.cdOver ? '<p class="text-[10px] text-red-400 font-bold mt-1 animate-pulse">OVER CAPACITY by ' + (cap.cd - cap.cdMax) + '!</p>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+             
+             container.innerHTML = `<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">Tour Stock</h2>${capacityHtml}<div class="w-full card-modern bg-gradient-to-br from-blue-900/40 to-slate-800 border-l-4 border-blue-500 text-center"><h3 class="text-sm font-bold text-blue-400 mb-1 flex items-center justify-center gap-2"><i class="fas fa-shuttle-van"></i> Tour Logistics</h3><p class="text-xs text-slate-400 mb-4 font-semibold">Move stock between Warehouse & Bus</p><div class="grid grid-cols-2 gap-4"><button onclick="toggleTransferForm('TO_TOUR')" class="btn-secondary bg-slate-700 hover:bg-slate-600 border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-out-alt text-2xl text-blue-400"></i><span class="text-xs font-bold uppercase mt-1">Load Bus</span></div></button><button onclick="toggleTransferForm('TO_HOME')" class="btn-secondary bg-slate-700 hover:bg-slate-600 border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-in-alt text-2xl text-green-400"></i><span class="text-xs font-bold uppercase mt-1">Unload</span></div></button></div><div id="transferFormContainer" class="hidden mt-6 bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner animate-pop text-left"><h4 id="transferTitle" class="text-white font-bold text-sm uppercase mb-4 text-center border-b border-slate-800 pb-2">Transfer</h4><form onsubmit="submitTransfer(event)" id="transferForm"><input type="hidden" name="transferType" id="transferType"><div class="mb-4"><label class="text-xs text-slate-500 font-bold block mb-1">Date</label><input type="date" name="transferDate" required class="input-modern" value="${new Date().toISOString().split('T')[0]}"></div><div class="space-y-3 mb-5 max-h-60 overflow-y-auto no-scrollbar">${ITEMS.map(item => `<div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg"><div class="flex items-center gap-2"><i class="fas ${item.icon} ${item.color} w-5 text-center"></i><label class="text-xs text-slate-300 font-bold">${item.label}</label></div><input type="number" name="t_qty_${item.id}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black"></div>`).join('')}</div><div id="transferCapacityWarning" class="hidden mb-4 bg-red-500/10 border border-red-500/30 p-3 rounded-xl text-xs text-red-400 font-bold text-center"></div><button type="submit" class="btn-fun text-lg"><i class="fas fa-check-circle"></i> Confirm</button></form></div></div><div class="w-full"><div class="grid grid-cols-1 gap-3">${ITEMS.map(item => { const levels = getStockLevels(item.id); const isLow = levels.tour <= 20; return `<div class="bg-slate-800 p-4 rounded-xl border ${isLow ? 'border-red-500/50' : 'border-slate-700'} shadow-md flex justify-between items-center relative overflow-hidden"><div class="flex items-center gap-4 z-10"><div class="w-10 h-10 rounded-lg ${item.bg} ${item.border} border flex items-center justify-center shrink-0 shadow-lg"><i class="fas ${item.icon} ${item.color} text-lg"></i></div><div class="flex flex-col"><span class="text-sm font-bold text-slate-200">${item.label}</span>${isLow ? '<span class="text-[10px] text-red-400 font-bold animate-pulse">Low on Bus!</span>' : ''}</div></div><div class="flex items-center gap-6"><div class="flex flex-col items-center"><span class="text-[10px] text-blue-400 font-bold uppercase">Bus</span><span class="text-2xl font-extrabold ${isLow ? 'text-red-400' : 'text-blue-400'}">${levels.tour}</span></div><div class="w-px h-8 bg-slate-700"></div><div class="flex flex-col items-center"><span class="text-[10px] text-slate-500 font-bold uppercase">Left Home</span><span class="text-lg font-bold text-slate-400">${levels.home}</span></div></div></div>`}).join('')}</div></div></div>`;
+        };
+
+        window.renderInventory = () => {
+             const container = document.getElementById('view-inventory');
+             const stockSummary = ITEMS.filter(i => state.inventory[i.id] > 0).map(i => `${i.label}: ${state.inventory[i.id]}`).join(', ') || "No stock set";
+             const reorderList = ITEMS.filter(i => { const levels = getStockLevels(i.id); return levels.home < i.lowThreshold; });
+             container.innerHTML = `<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">Home Stock</h2>${reorderList.length > 0 ? `<div class="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-xl animate-pop"><h3 class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> Reorder List</h3><div class="space-y-1">${reorderList.map(i => `<div class="flex justify-between text-sm text-slate-300"><span>${i.label}</span><span class="font-bold text-red-400">< ${i.lowThreshold}</span></div>`).join('')}</div></div>` : ''}<div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 ml-1 text-center">Live Count</h2><div class="grid grid-cols-2 gap-3">${ITEMS.map(item => { const levels = getStockLevels(item.id); const isLow = levels.home < item.lowThreshold; return `<div class="bg-slate-800 p-3 rounded-xl border ${isLow ? 'border-red-500/30' : 'border-slate-700'} flex flex-col items-center justify-center relative overflow-hidden"><span class="text-xs text-slate-400 font-bold mb-1 text-center leading-tight">${item.label}</span><span class="text-xl font-extrabold ${isLow ? 'text-red-400' : 'text-white'}" id="homeVal_${item.id}">${levels.home}</span></div>`}).join('')}</div></div><div class="w-full card-modern transition-all duration-300"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Initial Master Stock</h3>${state.ui.masterStockCollapsed ? `<button onclick="toggleMasterStock(false)" class="text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded font-bold uppercase">Edit</button>` : `<button onclick="toggleMasterStock(true)" class="text-[10px] bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded font-bold uppercase">Done</button>`}</div>${state.ui.masterStockCollapsed ? `<div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"><p class="text-xs text-slate-400 font-mono truncate leading-relaxed">${stockSummary}</p></div>` : `<div class="space-y-3 animate-pop">${ITEMS.map(item => `<div class="flex justify-between items-center border-b border-slate-700/30 last:border-0 pb-2"><label class="text-sm text-slate-300 font-bold flex items-center gap-3"><div class="w-6 h-6 rounded bg-slate-700 flex items-center justify-center"><i class="fas ${item.icon} ${item.color} text-xs"></i></div>${item.label}</label><input type="number" value="${state.inventory[item.id]}" oninput="updateInitialStock('${item.id}', this.value)" class="input-modern w-24 text-center py-1 text-black font-extrabold border-slate-600"></div>`).join('')}<button onclick="toggleMasterStock(true)" class="btn-primary mt-3 py-2 text-sm">Finish Editing</button></div>`}</div></div>`;
+        };
+
+        window.renderSettings = () => {
+             const container = document.getElementById('view-settings');
+             container.innerHTML = `<div class="space-y-6 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white tracking-tight px-1 text-center">Settings</h2><div class="w-full card-modern"><label class="block text-xs text-slate-400 font-bold uppercase tracking-widest mb-3">Graphic Designer (Shani)</label><div class="flex items-center gap-3"><input type="number" value="${state.settings.designerPercent}" onchange="updateSetting('designerPercent', this.value)" class="input-modern w-32 text-center text-xl font-extrabold text-black"><span class="text-slate-500 font-bold">%</span></div><p class="text-[10px] text-slate-500 mt-2 italic">* Applies to Posters, Totes, Postcards only</p></div><div class="w-full card-modern border-l-4 border-amber-500"><label class="block text-xs text-amber-400 font-bold uppercase tracking-widest mb-3"><i class="fas fa-suitcase-rolling mr-1"></i> Suitcase Capacity</label><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max Vinyl</label><input type="number" value="${SUITCASE_LIMITS.vinyl}" onchange="SUITCASE_LIMITS.vinyl=parseInt(this.value)||40" class="input-modern text-center text-lg font-extrabold text-black"></div><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max CD</label><input type="number" value="${SUITCASE_LIMITS.cd}" onchange="SUITCASE_LIMITS.cd=parseInt(this.value)||100" class="input-modern text-center text-lg font-extrabold text-black"></div></div><p class="text-[10px] text-slate-500 mt-2 italic">* Combined across both albums</p></div><div class="w-full card-modern border-l-4 border-yellow-500"><label class="block text-xs text-yellow-500 font-bold uppercase tracking-widest mb-3"><i class="fas fa-bell"></i> Low Stock Alerts</label><input type="email" placeholder="your@email.com" value="${state.settings.email || ''}" onchange="updateSetting('email', this.value)" class="input-modern text-sm"></div><div class="w-full card-modern space-y-4 border-l-4 border-green-500"><h3 class="text-xs font-bold text-green-500 uppercase tracking-widest flex items-center gap-2"><i class="fas fa-file-excel"></i> Export Data</h3><div class="grid grid-cols-2 gap-3"><button onclick="exportCSV('ALL')" class="btn-secondary py-3 text-xs bg-slate-700">All Year CSV</button><button onclick="exportPDF()" class="btn-secondary py-3 text-xs bg-red-600 hover:bg-red-500">Backup to PDF</button></div></div><div class="pt-10 pb-10"><button onclick="if(confirm('Wipe all data?')) { localStorage.removeItem(DB_KEY); location.reload(); }" class="text-red-500/50 text-xs w-full text-center hover:text-red-500 hover:underline font-bold uppercase tracking-widest">Reset App Data</button></div></div>`;
+        };
+
+        // --- Toggle Logic ---
+        window.toggleTourCollapse = (tourName) => {
+            state.ui.collapsedTours[tourName] = !state.ui.collapsedTours[tourName];
+            saveData();
+            window.renderDashboard();
+        };
+
+        // --- CORE HELPERS ---
+        window.router = (view) => {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active')); document.getElementById(`view-${view}`).classList.add('active');
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('nav-active')); const activeBtn = document.getElementById(`nav-${view}`); if (activeBtn) activeBtn.classList.add('nav-active');
+            if (view === 'dashboard') window.renderDashboard(); if (view === 'vendor') window.renderVendor(); if (view === 'tour-stock') window.renderTourStock(); if (view === 'inventory') window.renderInventory(); if (view === 'label') window.renderLabel(); if (view === 'settings') window.renderSettings(); if (view === 'add-show') window.renderAddShow();
+            window.scrollTo(0,0);
+        };
+
+        let touchStartX = 0, touchEndX = 0; const mainEl = document.querySelector('main'); mainEl.addEventListener('touchstart', e => touchStartX = e.changedTouches[0].screenX); mainEl.addEventListener('touchend', e => { touchEndX = e.changedTouches[0].screenX; handleSwipe(); });
+        const handleSwipe = () => { const tabs = ['dashboard', 'add-show', 'vendor', 'tour-stock', 'inventory', 'label']; const current = tabs.find(t => document.getElementById(`view-${t}`).classList.contains('active')); const idx = tabs.indexOf(current); if (touchEndX < touchStartX - 50 && idx < tabs.length - 1) window.router(tabs[idx + 1]); if (touchEndX > touchStartX + 50 && idx > 0) window.router(tabs[idx - 1]); };
+
+        const fireConfetti = () => { const canvas = document.getElementById('confetti-canvas'); const ctx = canvas.getContext('2d'); canvas.width = window.innerWidth; canvas.height = window.innerHeight; const particles = []; for(let i=0; i<100; i++) particles.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height-canvas.height, vx: Math.random()*4-2, vy: Math.random()*5+5, color: `hsl(${Math.random()*360}, 70%, 50%)`, size: Math.random()*8+4}); const animate = () => { ctx.clearRect(0,0, canvas.width, canvas.height); let active = false; particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.size,p.size); if(p.y<canvas.height) active=true; }); if(active) requestAnimationFrame(animate); else ctx.clearRect(0,0,canvas.width, canvas.height); }; animate(); };
+
+        window.submitShow = (e) => {
+            e.preventDefault(); const form = e.target;
+            let tourName = form.tourSelect.value; if (tourName === 'NEW') tourName = form.newTour.value.trim(); if (!tourName) tourName = "Individual Gig";
+            let currency = form.currency.value.toUpperCase() || 'EUR';
+            const pCash = parseFloat(form.pay_cash.value)||0; const pCard = parseFloat(form.pay_card.value)||0; const pPaypal = parseFloat(form.pay_paypal.value)||0;
+            const showData = { id: editingShowId || Date.now(), tour: tourName, city: form.city.value, venue: form.venue.value, date: form.date.value, currency: currency, venuePercent: parseFloat(form.venuePercent.value) || 0, sales: {}, freebies: {}, paymentMethods: { cash: pCash, card: pCard, paypal: pPaypal } };
+            ITEMS.forEach(item => { const qty = parseInt(form[`qty_${item.id}`].value) || 0; const price = parseFloat(form[`price_${item.id}`].value) || 0; if (qty > 0) showData.sales[item.id] = { qty, price }; if (price > 0 && !editingShowId) state.settings.lastPrices[item.id] = price; const free = parseInt(form[`free_${item.id}`].value) || 0; if (free > 0) showData.freebies[item.id] = free; });
+            if (editingShowId) { const idx = state.shows.findIndex(s => s.id === editingShowId); state.shows[idx] = showData; editingShowId = null; } else { state.shows.push(showData); setUndo('add_show', showData); fireConfetti(); }
+            pendingVendorData = null; saveData(); form.reset(); window.router('dashboard'); showToast("Show Log Saved!", "fa-thumbs-up");
+        };
+
+        window.handleTourSelect = (select) => {
+            const input = document.getElementById('newTourInput'); const banner = document.getElementById('tourNameBanner'); const display = document.getElementById('tourNameDisplay'); const card = document.getElementById('logDetailsCard');
+            if (select.value === 'NEW') { input.classList.remove('hidden'); input.focus(); banner.classList.add('hidden'); card.className = "card-modern"; } else if (select.value) { input.classList.add('hidden'); banner.classList.remove('hidden'); display.innerText = select.value; card.className = "card-modern border-2 border-indigo-500 bg-gradient-to-br from-slate-800 to-indigo-900/30"; } else { input.classList.add('hidden'); banner.classList.add('hidden'); card.className = "card-modern"; }
+        };
+
+        window.openGigModal = (id) => {
+            const s = state.shows.find(s => s.id === id); const body = document.getElementById('modalBody'); const footer = document.getElementById('modalFooter'); document.getElementById('modalTitle').innerText = `${s.city}`;
+            let salesHtml = Object.keys(s.sales).length ? Object.entries(s.sales).map(([k,v]) => { const l = getItem(k).label; return `<div class="flex justify-between text-sm text-slate-300"><span>${l} (x${v.qty})</span><span>${v.price} ${s.currency}</span></div>` }).join('') : '<p class="text-slate-500 text-sm italic">No Sales Recorded</p>';
+            body.innerHTML = `<div class="space-y-3"><div class="flex justify-between text-xs font-bold text-slate-500 uppercase border-b border-slate-700 pb-2"><span>${s.date}</span><span>${s.tour}</span></div><div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700">${salesHtml}</div><div class="text-right text-xs text-slate-400 font-bold uppercase mt-2">${s.venue}</div></div>`;
+            footer.innerHTML = `<button onclick="closeModal(); editShow(${id})" class="btn-primary py-2 text-sm">Edit Log</button><button onclick="closeModal()" class="btn-secondary py-2 text-sm bg-transparent border-slate-600">Close</button>`;
+            document.getElementById('modalOverlay').classList.remove('hidden'); setTimeout(() => document.getElementById('modalContent').classList.remove('opacity-0', 'scale-95'), 10);
+        };
+        window.editShow = (id) => { editingShowId = id; window.router('add-show'); };
+        window.toggleTransferForm = (t) => { document.getElementById('transferFormContainer').classList.remove('hidden'); document.getElementById('transferType').value = t; document.getElementById('transferTitle').innerText = t === 'TO_TOUR' ? "Load Bus" : "Unload Bus"; };
+        
+        window.submitTransfer = (e) => { 
+            e.preventDefault(); const f=e.target; const t=f.transferType.value; const items={}; 
+            ITEMS.forEach(i=>{ const q=parseInt(f[`t_qty_${i.id}`].value)||0; if(q>0)items[i.id]=q; }); 
+            if(!Object.keys(items).length) return alert("Enter qty"); 
+            
+            // Check suitcase capacity for TO_TOUR transfers
+            if (t === 'TO_TOUR') {
+                const cap = getTourCapacity();
+                let newVinyl = cap.vinyl, newCd = cap.cd;
+                ITEMS.forEach(item => {
+                    const qty = items[item.id] || 0;
+                    if (item.type === 'vinyl') newVinyl += qty;
+                    else if (item.type === 'cd') newCd += qty;
+                });
+                const warnings = [];
+                if (newVinyl > SUITCASE_LIMITS.vinyl) warnings.push(`Vinyl: ${newVinyl}/${SUITCASE_LIMITS.vinyl} (over by ${newVinyl - SUITCASE_LIMITS.vinyl})`);
+                if (newCd > SUITCASE_LIMITS.cd) warnings.push(`CD: ${newCd}/${SUITCASE_LIMITS.cd} (over by ${newCd - SUITCASE_LIMITS.cd})`);
+                if (warnings.length > 0) {
+                    if (!confirm(`⚠️ SUITCASE OVER CAPACITY!\n\n${warnings.join('\n')}\n\nProceed anyway?`)) return;
+                }
+            }
+            
+            const d = { id:Date.now(), date:f.transferDate.value, type:t, items }; 
+            state.transfers.push(d); setUndo('transfer',d); saveData(); 
+            document.getElementById('transferFormContainer').classList.add('hidden'); f.reset(); 
+            window.renderTourStock(); 
+            if(t === 'TO_TOUR') showToast("Bus Loaded! 👍", "fa-thumbs-up"); else showToast("Bus Unloaded", "fa-check"); 
+        };
+        
+        window.updateInitialStock = (id, val) => { state.inventory[id] = parseInt(val)||0; saveData(); document.getElementById(`homeVal_${id}`).innerText = getStockLevels(id).home; };
+        window.toggleMasterStock = (c) => { state.ui.masterStockCollapsed = c; saveData(); window.renderInventory(); };
+        window.updateSetting = (k, v) => { state.settings[k] = k==='designerPercent'?parseFloat(v):v; saveData(); showToast('Settings Updated'); };
+        window.updateOverviewTour = (v) => { state.ui.selectedOverviewTour = v; window.renderDashboard(); saveData(); };
+        window.exportCSV = (t) => { let data = []; const headers = ["Date", "Tour", "City", "Venue", "Currency", "Gross", "Venue Cut", "Net", "Designer Cut", "Take Home (Local)", "Take Home (EUR)"]; let source = state.shows; let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\r\n"; source.forEach(show => { let showGross = 0; ITEMS.forEach(item => { const sale = show.sales?.[item.id]; if(sale && sale.qty > 0) showGross += (sale.qty * sale.price); }); const net = showGross * (1 - ((show.venuePercent||0)/100)); const takeHome = net * (1 - ((state.settings.designerPercent||0)/100)); let row = [show.date, `"${show.tour}"`, `"${show.city}"`, `"${show.venue}"`, show.currency, showGross.toFixed(2), "", net.toFixed(2), "", takeHome.toFixed(2), ""]; csvContent += row.join(",") + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", "merch.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+        window.exportPDF = () => { const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(18); doc.text("Shai Maestro Merch Backup", 10, 10); doc.setFontSize(10); let y = 20; doc.text(`Total Shows: ${state.shows.length}`, 10, y+=10); doc.text(`Current Stock (Warehouse):`, 10, y+=10); ITEMS.forEach(i => { doc.text(`- ${i.label}: ${state.inventory[i.id]}`, 15, y+=6); }); doc.save("merch_backup.pdf"); };
+        
+        window.addTempItem = () => { const select = document.getElementById('shp_temp_itemId'); const qty=parseInt(document.getElementById('shp_temp_qty').value), cost=parseFloat(document.getElementById('shp_temp_cost').value); if(!qty||isNaN(cost))return alert("Enter Qty/Cost"); tempShipmentItems.push({itemId:select.value, qty, cost}); lastLabelSelection = select.value; document.getElementById('shp_temp_qty').value=''; document.getElementById('shp_temp_cost').value=''; window.renderLabel(); };
+        window.removeTempItem = (i) => { tempShipmentItems.splice(i,1); window.renderLabel(); };
+        window.saveShipment = () => { if(!tempShipmentItems.length)return alert("No items"); const d = { id:editingShipmentId||Date.now(), date:document.getElementById('shp_date').value, invoice:document.getElementById('shp_invoice').value, shipping:parseFloat(document.getElementById('shp_shipping').value)||0, paid:document.getElementById('shp_paid').checked, paidDate:document.getElementById('shp_paidDate').value, items:tempShipmentItems }; if(editingShipmentId) { state.shipments[state.shipments.findIndex(s=>s.id===editingShipmentId)]=d; editingShipmentId=null;} else { state.shipments.push(d); setUndo('add_shipment', d); } saveData(); window.resetShipmentForm(); };
+        window.openShipmentModal = (id) => { const s=state.shipments.find(s=>s.id===id); const b=document.getElementById('modalBody'); const f=document.getElementById('modalFooter'); document.getElementById('modalTitle').innerText="Shipment Details"; b.innerHTML=`<div class="space-y-2"><p class="text-slate-400 text-xs uppercase font-bold">Inv: ${s.invoice}</p><div class="bg-slate-900/50 p-2 rounded">${s.items.map(i=>`<div>${getItem(i.itemId).label} x${i.qty}</div>`).join('')}</div></div>`; f.innerHTML = `<button onclick="closeModal(); editShipment(${id})" class="btn-primary py-2 text-sm">Edit</button>`; document.getElementById('modalOverlay').classList.remove('hidden'); setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10); };
+        window.editShipment = (id) => { editingShipmentId = id; tempShipmentItems = [...state.shipments.find(s=>s.id===id).items]; window.router('label'); };
+        window.closeModal = () => { document.getElementById('modalContent').classList.add('opacity-0', 'scale-95'); setTimeout(()=>document.getElementById('modalOverlay').classList.add('hidden'),200); };
+        window.togglePaidDate = (c) => { document.getElementById('shp_paidDate').classList.toggle('hidden', !c); };
+        window.resetShipmentForm = () => { editingShipmentId=null; tempShipmentItems=[]; window.renderLabel(); };
+        window.updateCurrencyLabels = (val) => { let symbol = '€'; const v = val.toUpperCase(); if(['USD','CAD','AUD'].includes(v)) symbol = '$'; else if(v === 'GBP') symbol = '£'; else if(v === 'ILS') symbol = '₪'; else if(v === 'CZK') symbol = 'Kč'; else if(v === 'PLN') symbol = 'zł'; document.querySelectorAll('.currency-label').forEach(el => el.innerText = symbol); };
+
+        loadData(); window.router('dashboard');
+    </script>
+</body>
+</html>
