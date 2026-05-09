@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Shai Maestro Merch Sales</title>
+    <script>
+        // Silence Tailwind CDN production warning - this is a personal app, not a public site
+        (function(){const o=console.warn;console.warn=function(...a){if(a[0]&&typeof a[0]==='string'&&a[0].includes('cdn.tailwindcss.com'))return;o.apply(console,a);};})();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         body { -webkit-tap-highlight-color: transparent; font-family: 'Outfit', sans-serif; background-color: #0f172a; overscroll-behavior-y: none; }
@@ -18,7 +23,7 @@
         .btn-primary { @apply w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold py-4 px-6 rounded-2xl shadow-lg shadow-blue-900/40 transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-3 text-lg; }
         .btn-save-gig { @apply w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-black py-5 px-6 rounded-3xl transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-4 text-xl tracking-wide uppercase border-t border-emerald-400/20; }
         .btn-fun { @apply w-full bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-black py-4 px-6 rounded-2xl shadow-xl transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-3 text-lg tracking-wide uppercase; }
-        .btn-vendor { @apply w-full bg-slate-700 hover:bg-slate-600 active:bg-blue-600 active:scale-95 text-white font-bold rounded-2xl shadow-lg border border-slate-600 transition-all duration-150 flex flex-col items-center justify-center relative overflow-hidden; height: 140px; }
+        .btn-vendor { @apply w-full bg-slate-700 hover:bg-slate-600 active:bg-blue-600 active:scale-95 text-white font-bold rounded-2xl shadow-lg border border-slate-600 transition-all duration-150 flex flex-col items-center justify-center relative overflow-hidden; height: 130px; }
         .btn-secondary { @apply w-full bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold py-3 px-4 rounded-xl shadow border border-slate-600 transform transition-all active:scale-95 flex justify-center items-center gap-2; }
         .btn-danger { @apply w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-extrabold py-3 px-6 rounded-2xl shadow-lg transform transition-all duration-200 active:scale-95 flex justify-center items-center gap-2 text-sm; }
         .nav-btn { @apply text-slate-500 transition-all duration-300 flex flex-col items-center justify-center h-full w-full relative z-10; }
@@ -31,6 +36,9 @@
         .tour-header { @apply cursor-pointer select-none transition-all active:scale-95; }
         .capacity-bar { height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.1); }
         .capacity-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .toggle-pill { display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 9999px; padding: 3px; }
+        .toggle-pill button { padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; transition: all 0.2s; }
+        .toggle-pill button.active { background: #2563eb; color: white; box-shadow: 0 2px 8px rgba(37,99,235,0.4); }
     </style>
 </head>
 <body class="text-slate-100 min-h-screen pb-32 selection:bg-blue-500 selection:text-white overflow-x-hidden">
@@ -53,102 +61,1386 @@
         <button id="nav-label" onclick="router('label')" class="nav-btn"><i class="fas fa-file-invoice mb-1"></i><span class="text-[9px] font-bold uppercase">Label</span></button>
     </div></nav>
     <script>
-const DB_KEY='shai_maestro_merch_v11';
+const DB_KEY='shai_maestro_merch_v12';
+const OLD_DB_KEY='shai_maestro_merch_v11';
 const SUITCASE_LIMITS={vinyl:40,cd:100};
 const CURRENCIES=[{code:'EUR',symbol:'€',name:'Euro'},{code:'GBP',symbol:'£',name:'British Pound'},{code:'USD',symbol:'$',name:'US Dollar'},{code:'CHF',symbol:'Fr',name:'Swiss Franc'},{code:'CZK',symbol:'Kč',name:'Czech Koruna'},{code:'DKK',symbol:'kr',name:'Danish Krone'},{code:'HUF',symbol:'Ft',name:'Hungarian Forint'},{code:'ISK',symbol:'kr',name:'Icelandic Króna'},{code:'NOK',symbol:'kr',name:'Norwegian Krone'},{code:'PLN',symbol:'zł',name:'Polish Zloty'},{code:'RON',symbol:'lei',name:'Romanian Leu'},{code:'RSD',symbol:'дин',name:'Serbian Dinar'},{code:'SEK',symbol:'kr',name:'Swedish Krona'},{code:'GEL',symbol:'₾',name:'Georgian Lari'},{code:'ILS',symbol:'₪',name:'Israeli Shekel'},{code:'CAD',symbol:'$',name:'Canadian Dollar'},{code:'BRL',symbol:'R$',name:'Brazilian Real'},{code:'JPY',symbol:'¥',name:'Japanese Yen'},{code:'KRW',symbol:'₩',name:'S. Korean Won'},{code:'INR',symbol:'₹',name:'Indian Rupee'},{code:'HKD',symbol:'$',name:'Hong Kong Dollar'},{code:'MXN',symbol:'$',name:'Mexican Peso'},{code:'THB',symbol:'฿',name:'Thai Baht'},{code:'CNY',symbol:'¥',name:'Chinese Yuan'},{code:'CLP',symbol:'$',name:'Chilean Peso'}];
 const getSym=(c)=>{const f=CURRENCIES.find(x=>x.code===c);return f?f.symbol:c;};
 const curOpts=(sel)=>CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===sel?'selected':''}>${c.code} — ${c.symbol} ${c.name}</option>`).join('');
-const ITEMS=[{id:'guest_vinyl',label:'GUESTHOUSE VINYL',icon:'fa-record-vinyl',type:'vinyl',color:'text-indigo-400',bg:'bg-indigo-400/10',border:'border-indigo-500/30',lowThreshold:60},{id:'guest_cd',label:'GUESTHOUSE CD',icon:'fa-compact-disc',type:'cd',color:'text-cyan-300',bg:'bg-cyan-300/10',border:'border-cyan-400/30',lowThreshold:60},{id:'mini_vinyl',label:'MINIATURES VINYL',icon:'fa-record-vinyl',type:'vinyl',color:'text-purple-400',bg:'bg-purple-400/10',border:'border-purple-500/30',lowThreshold:60},{id:'mini_cd',label:'MINIATURES CD',icon:'fa-compact-disc',type:'cd',color:'text-sky-300',bg:'bg-sky-300/10',border:'border-sky-400/30',lowThreshold:60},{id:'postcards',label:'POSTCARDS',icon:'fa-image',type:'merch',color:'text-emerald-400',bg:'bg-emerald-400/10',border:'border-emerald-500/30',lowThreshold:100},{id:'poster',label:'POSTERS',icon:'fa-scroll',type:'merch',color:'text-teal-400',bg:'bg-teal-400/10',border:'border-teal-500/30',lowThreshold:30},{id:'tote',label:'TOTE BAGS',icon:'fa-shopping-bag',type:'merch',color:'text-green-400',bg:'bg-green-400/10',border:'border-green-500/30',lowThreshold:30}];
+
+// Items (component items - tracked in inventory)
+const ITEMS=[
+    {id:'guest_vinyl',label:'GUESTHOUSE VINYL',shortLabel:'GH VINYL',icon:'fa-record-vinyl',type:'vinyl',color:'text-indigo-400',bg:'bg-indigo-400/10',border:'border-indigo-500/30',lowThreshold:60},
+    {id:'guest_cd',label:'GUESTHOUSE CD',shortLabel:'GH CD',icon:'fa-compact-disc',type:'cd',color:'text-cyan-300',bg:'bg-cyan-300/10',border:'border-cyan-400/30',lowThreshold:60},
+    {id:'mini_vinyl',label:'MINIATURES VINYL',shortLabel:'MINI VINYL',icon:'fa-record-vinyl',type:'vinyl',color:'text-purple-400',bg:'bg-purple-400/10',border:'border-purple-500/30',lowThreshold:60},
+    {id:'poster',label:'POSTERS',shortLabel:'POSTER',icon:'fa-scroll',type:'merch',color:'text-teal-400',bg:'bg-teal-400/10',border:'border-teal-500/30',lowThreshold:30}
+];
+
+// Bundles - composite items that decompose into components on save
+// Each bundle defines which component items it decrements when sold
+const BUNDLES=[
+    {id:'bundle_vinyl_cd',label:'VINYL + CD',shortLabel:'V+CD',icon:'fa-layer-group',color:'text-amber-300',bg:'bg-amber-400/10',border:'border-amber-500/40',components:['guest_vinyl','guest_cd']},
+    {id:'bundle_vinyl_poster',label:'VINYL + POSTER',shortLabel:'V+POS',icon:'fa-layer-group',color:'text-rose-300',bg:'bg-rose-400/10',border:'border-rose-500/40',components:['guest_vinyl','poster']},
+    {id:'bundle_cd_poster',label:'CD + POSTER',shortLabel:'CD+POS',icon:'fa-layer-group',color:'text-lime-300',bg:'bg-lime-400/10',border:'border-lime-500/40',components:['guest_cd','poster']}
+];
+
+// All sellable line items (for vendor mode, gig form, etc)
+const ALL_SELLABLE=[...ITEMS, ...BUNDLES];
+
 const TC=[{bg:'bg-purple-900/40',border:'border-purple-500',text:'text-purple-400',line:'bg-purple-500'},{bg:'bg-blue-900/40',border:'border-blue-500',text:'text-blue-400',line:'bg-blue-500'},{bg:'bg-emerald-900/40',border:'border-emerald-500',text:'text-emerald-400',line:'bg-emerald-500'},{bg:'bg-amber-900/40',border:'border-amber-500',text:'text-amber-400',line:'bg-amber-500'},{bg:'bg-pink-900/40',border:'border-pink-500',text:'text-pink-400',line:'bg-pink-500'},{bg:'bg-cyan-900/40',border:'border-cyan-500',text:'text-cyan-400',line:'bg-cyan-500'}];
-let state={shows:[],shipments:[],transfers:[],inventory:{},settings:{designerPercent:10,email:'',lastPrices:{},notifiedLowStock:{}},ui:{masterStockCollapsed:true,selectedOverviewTour:'CURRENT',collapsedTours:{}},vendorSession:{active:false,stock:{},prices:{},sales:[],meta:{}}};
-let tempShipmentItems=[],editingShipmentId=null,editingShowId=null,lastUndoAction=null,pendingVendorData=null,eurRates={EUR:1,USD:1.1,GBP:0.85,ILS:4.0,CZK:25.0,PLN:4.3,BRL:5.5,CAD:1.5,CLP:980,CNY:7.8,DKK:7.5,GEL:2.9,HKD:8.5,HUF:390,ISK:150,INR:90,JPY:160,KRW:1450,MXN:19,NOK:11.5,RON:5.0,RSD:117,SEK:11.3,CHF:0.95,THB:39};
+
+let state={shows:[],shipments:[],transfers:[],inventory:{},settings:{email:'',lastPrices:{},notifiedLowStock:{},dataVersion:12,migrationDone:false},ui:{masterStockCollapsed:true,selectedOverviewTour:'CURRENT',collapsedTours:{}},vendorSession:{active:false,stock:{},prices:{},sales:[],meta:{}}};
+
+let tempShipmentItems=[],editingShipmentId=null,editingShowId=null,lastUndoAction=null,pendingVendorData=null;
+let eurRates={EUR:1,USD:1.1,GBP:0.85,ILS:4.0,CZK:25.0,PLN:4.3,BRL:5.5,CAD:1.5,CLP:980,CNY:7.8,DKK:7.5,GEL:2.9,HKD:8.5,HUF:390,ISK:150,INR:90,JPY:160,KRW:1450,MXN:19,NOK:11.5,RON:5.0,RSD:117,SEK:11.3,CHF:0.95,THB:39};
+let ratesUpdatedAt=null;
 let lastLabelSelection=ITEMS[0].id;
-const loadData=()=>{const saved=localStorage.getItem(DB_KEY);if(saved){try{const p=JSON.parse(saved);state={...state,...p};if(!state.vendorSession.meta)state.vendorSession.meta={};if(!state.ui.collapsedTours)state.ui.collapsedTours={};}catch(e){}}ITEMS.forEach(item=>{if(state.inventory[item.id]===undefined)state.inventory[item.id]=0;});fetch('https://api.exchangerate-api.com/v4/latest/EUR').then(r=>r.json()).then(d=>{eurRates=d.rates;window.renderDashboard();}).catch(e=>{});};
+
+// =============== MIGRATION FROM v11 ===============
+// Strategy: keep historical data but redistribute removed items into bundles.
+// - postcards -> bundle_vinyl_poster
+// - tote      -> bundle_cd_poster
+// - mini_cd   -> deleted (noise)
+// - designerPercent -> removed
+const MIGRATION_MAP = {
+    'postcards': 'bundle_vinyl_poster',
+    'tote': 'bundle_cd_poster',
+    'mini_cd': null  // delete
+};
+
+const migrateFromV11=(oldData)=>{
+    const newData = JSON.parse(JSON.stringify(oldData));
+    let migrationLog = {gigsTouched: 0, postcardSales: 0, toteSales: 0, miniCdSales: 0, postcardsRedirected: 0, totesRedirected: 0};
+
+    // Migrate shows: remap sales and freebies keys
+    if (newData.shows) {
+        newData.shows.forEach(show => {
+            let touched = false;
+            if (show.sales) {
+                const newSales = {};
+                Object.entries(show.sales).forEach(([key, val]) => {
+                    if (key === 'mini_cd') {
+                        migrationLog.miniCdSales += (val.qty || 0);
+                        touched = true;
+                        return; // skip - delete
+                    }
+                    const targetKey = MIGRATION_MAP.hasOwnProperty(key) ? MIGRATION_MAP[key] : key;
+                    if (targetKey === null) return;
+                    if (key === 'postcards') { migrationLog.postcardSales += (val.qty||0); migrationLog.postcardsRedirected++; touched = true; }
+                    if (key === 'tote') { migrationLog.toteSales += (val.qty||0); migrationLog.totesRedirected++; touched = true; }
+                    // If target already has data (rare), merge by summing qty and keeping max price
+                    if (newSales[targetKey]) {
+                        newSales[targetKey] = {qty: newSales[targetKey].qty + val.qty, price: Math.max(newSales[targetKey].price, val.price)};
+                    } else {
+                        newSales[targetKey] = {qty: val.qty, price: val.price};
+                    }
+                });
+                show.sales = newSales;
+            }
+            if (show.freebies) {
+                const newFree = {};
+                Object.entries(show.freebies).forEach(([key, qty]) => {
+                    if (key === 'mini_cd') return;
+                    const targetKey = MIGRATION_MAP.hasOwnProperty(key) ? MIGRATION_MAP[key] : key;
+                    if (targetKey === null) return;
+                    newFree[targetKey] = (newFree[targetKey] || 0) + qty;
+                });
+                show.freebies = newFree;
+            }
+            if (touched) migrationLog.gigsTouched++;
+        });
+    }
+
+    // Migrate shipments: drop line items for removed component items (postcards/tote/mini_cd were tracked at component level)
+    // Keep shipment line items for postcards/tote since they were physically shipped — but they're no longer in our item list.
+    // Decision: drop them since we have no inventory category for them. User said "focus on the future".
+    if (newData.shipments) {
+        newData.shipments.forEach(ship => {
+            if (ship.items) {
+                ship.items = ship.items.filter(i => !['postcards','tote','mini_cd'].includes(i.itemId));
+            }
+        });
+    }
+
+    // Migrate transfers: drop transferred quantities of removed items
+    if (newData.transfers) {
+        newData.transfers.forEach(tr => {
+            if (tr.items) {
+                ['postcards','tote','mini_cd'].forEach(k => delete tr.items[k]);
+            }
+        });
+    }
+
+    // Migrate inventory: drop removed items
+    if (newData.inventory) {
+        ['postcards','tote','mini_cd'].forEach(k => delete newData.inventory[k]);
+    }
+
+    // Settings: remove designerPercent
+    if (newData.settings) {
+        delete newData.settings.designerPercent;
+        delete newData.settings.notifiedLowStock; // reset alerts
+        newData.settings.dataVersion = 12;
+        newData.settings.migrationDone = true;
+    }
+
+    // Last prices: drop removed items from price memory
+    if (newData.settings && newData.settings.lastPrices) {
+        ['postcards','tote','mini_cd'].forEach(k => delete newData.settings.lastPrices[k]);
+    }
+
+    return {data: newData, log: migrationLog};
+};
+
+const loadData=()=>{
+    const savedV12 = localStorage.getItem(DB_KEY);
+    const savedV11 = localStorage.getItem(OLD_DB_KEY);
+
+    if (savedV12) {
+        try {
+            const p = JSON.parse(savedV12);
+            state = {...state, ...p};
+            if (!state.vendorSession.meta) state.vendorSession.meta = {};
+            if (!state.ui.collapsedTours) state.ui.collapsedTours = {};
+        } catch(e) { console.error('v12 parse fail', e); }
+    } else if (savedV11) {
+        // Run migration
+        try {
+            const oldData = JSON.parse(savedV11);
+            const {data: newData, log} = migrateFromV11(oldData);
+            state = {...state, ...newData};
+            if (!state.vendorSession.meta) state.vendorSession.meta = {};
+            if (!state.ui.collapsedTours) state.ui.collapsedTours = {};
+            saveData();
+            // Show migration summary on first load
+            setTimeout(() => {
+                const summary = `Migration complete:\n\n• ${log.gigsTouched} gig(s) updated\n• ${log.postcardSales} postcard sales → Vinyl+Poster bundles\n• ${log.toteSales} tote sales → CD+Poster bundles\n• ${log.miniCdSales} mini-CD sales removed (noise)\n\nDesigner cut removed.\nStock will recalculate from actual bundle decomposition.\n\nYour v11 data is preserved as a backup.`;
+                alert(summary);
+            }, 500);
+        } catch(e) { console.error('migration fail', e); alert('Migration failed: ' + e.message); }
+    }
+
+    // Ensure all current items have inventory keys
+    ITEMS.forEach(item => {
+        if (state.inventory[item.id] === undefined) state.inventory[item.id] = 0;
+    });
+
+    // Fetch live exchange rates with caching + multi-API fallback
+    fetchExchangeRates();
+};
+
+// Rate fetching strategy:
+// 1. Load cached rates from localStorage immediately (so we never start with stale hardcoded values if we've ever succeeded before)
+// 2. Try Frankfurter (ECB-backed, no key, very reliable, CORS-friendly)
+// 3. Fallback to exchangerate-api.com
+// 4. If both fail, keep whatever we loaded from cache (or hardcoded if first run)
+const RATES_CACHE_KEY = 'shai_eur_rates_cache_v1';
+
+const loadCachedRates = () => {
+    try {
+        const cached = localStorage.getItem(RATES_CACHE_KEY);
+        if (!cached) return false;
+        const {rates, timestamp} = JSON.parse(cached);
+        if (rates && Object.keys(rates).length > 5) {
+            eurRates = rates;
+            ratesUpdatedAt = new Date(timestamp);
+            return true;
+        }
+    } catch(e) {}
+    return false;
+};
+
+const saveCachedRates = () => {
+    try {
+        localStorage.setItem(RATES_CACHE_KEY, JSON.stringify({rates: eurRates, timestamp: Date.now()}));
+    } catch(e) {}
+};
+
+const fetchExchangeRates = async () => {
+    // Step 1: load cache so dashboard renders immediately with the freshest rates we have
+    loadCachedRates();
+
+    // Step 2-3: try APIs in order
+    const sources = [
+        // Frankfurter: ECB-published rates, no key, CORS-friendly, very reliable
+        {name: 'Frankfurter', url: 'https://api.frankfurter.app/latest?from=EUR', parse: d => ({...d.rates, EUR: 1})},
+        // Backup
+        {name: 'exchangerate-api', url: 'https://api.exchangerate-api.com/v4/latest/EUR', parse: d => d.rates}
+    ];
+
+    for (const src of sources) {
+        try {
+            const r = await fetch(src.url);
+            if (!r.ok) continue;
+            const data = await r.json();
+            const parsed = src.parse(data);
+            if (parsed && Object.keys(parsed).length > 5) {
+                eurRates = parsed;
+                ratesUpdatedAt = new Date();
+                saveCachedRates();
+                if (window.renderDashboard) window.renderDashboard();
+                return;
+            }
+        } catch(e) {
+            // Silently fail - we have cached or fallback rates
+        }
+    }
+    // Both APIs failed - keep whatever we have (cached or hardcoded). No console output.
+};
+
 const saveData=()=>{localStorage.setItem(DB_KEY,JSON.stringify(state));};
+
 const showToast=(msg,icon='fa-check-circle')=>{const t=document.getElementById('toast');document.getElementById('toastMsg').innerText=msg;document.getElementById('toastIcon').className=`fas ${icon} text-xl`;t.className="show";setTimeout(()=>t.className="",4000);};
 const setUndo=(type,data)=>{lastUndoAction={type,data};showToast("Action Saved");};
 const handleUndo=()=>{if(!lastUndoAction)return;if(lastUndoAction.type==='add_show')state.shows.pop();else if(lastUndoAction.type==='add_shipment')state.shipments.pop();else if(lastUndoAction.type==='transfer')state.transfers.pop();saveData();location.reload();};
-const getStockLevels=(itemId)=>{let home=state.inventory[itemId]||0,tour=0;state.shipments.forEach(s=>s.items.forEach(i=>{if(i.itemId===itemId)home+=(parseInt(i.qty)||0);}));state.transfers.forEach(t=>{const qty=t.items[itemId]||0;if(t.type==='TO_TOUR'){home-=qty;tour+=qty;}else{tour-=qty;home+=qty;}});state.shows.forEach(s=>{if(s.sales?.[itemId])tour-=(parseInt(s.sales[itemId].qty)||0);if(s.freebies?.[itemId])tour-=(parseInt(s.freebies[itemId])||0);});return{home,tour};};
-const getItem=(id)=>ITEMS.find(i=>i.id===id)||{};
-const getTourCap=()=>{let v=0,c=0;ITEMS.forEach(i=>{const l=getStockLevels(i.id);if(i.type==='vinyl')v+=l.tour;else if(i.type==='cd')c+=l.tour;});return{vinyl:v,cd:c,vMax:SUITCASE_LIMITS.vinyl,cMax:SUITCASE_LIMITS.cd,vPct:Math.min(100,Math.round(v/SUITCASE_LIMITS.vinyl*100)),cPct:Math.min(100,Math.round(c/SUITCASE_LIMITS.cd*100)),vOver:v>SUITCASE_LIMITS.vinyl,cOver:c>SUITCASE_LIMITS.cd};};
-const calcNet=(s)=>{let g=0,m=0;ITEMS.forEach(i=>{const x=s.sales?.[i.id];if(x&&x.qty>0){const a=x.qty*x.price;g+=a;if(i.type==='merch')m+=a;}});const vc=g*((s.venuePercent||0)/100);const mn=m*(1-(s.venuePercent||0)/100);const dc=mn*((state.settings.designerPercent||0)/100);return g-vc-dc;};
 
+// Get item OR bundle definition
+const getSellable = (id) => ALL_SELLABLE.find(x => x.id === id) || {};
+const getItem = (id) => ITEMS.find(i => i.id === id) || {};
+const isBundle = (id) => BUNDLES.some(b => b.id === id);
+
+// Calculate stock levels - bundles decrement their components
+const getStockLevels=(itemId)=>{
+    let home=state.inventory[itemId]||0, tour=0;
+    state.shipments.forEach(s=>s.items.forEach(i=>{if(i.itemId===itemId)home+=(parseInt(i.qty)||0);}));
+    state.transfers.forEach(t=>{const qty=t.items[itemId]||0;if(t.type==='TO_TOUR'){home-=qty;tour+=qty;}else{tour-=qty;home+=qty;}});
+    state.shows.forEach(s=>{
+        // Direct sales of this component
+        if(s.sales?.[itemId]) tour-=(parseInt(s.sales[itemId].qty)||0);
+        if(s.freebies?.[itemId]) tour-=(parseInt(s.freebies[itemId])||0);
+        // Bundle sales that include this component
+        BUNDLES.forEach(bundle => {
+            if (bundle.components.includes(itemId)) {
+                if (s.sales?.[bundle.id]) tour -= (parseInt(s.sales[bundle.id].qty)||0);
+                if (s.freebies?.[bundle.id]) tour -= (parseInt(s.freebies[bundle.id])||0);
+            }
+        });
+    });
+    return{home,tour};
+};
+
+const getTourCap=()=>{
+    let v=0,c=0;
+    ITEMS.forEach(i=>{
+        const l=getStockLevels(i.id);
+        if(i.type==='vinyl')v+=l.tour;
+        else if(i.type==='cd')c+=l.tour;
+    });
+    return{vinyl:v,cd:c,vMax:SUITCASE_LIMITS.vinyl,cMax:SUITCASE_LIMITS.cd,vPct:Math.min(100,Math.round(v/SUITCASE_LIMITS.vinyl*100)),cPct:Math.min(100,Math.round(c/SUITCASE_LIMITS.cd*100)),vOver:v>SUITCASE_LIMITS.vinyl,cOver:c>SUITCASE_LIMITS.cd};
+};
+
+// Calculate net for a show. Venue cut can be % or fixed amount.
+const calcNet=(s)=>{
+    let g=0;
+    ALL_SELLABLE.forEach(i=>{
+        const x=s.sales?.[i.id];
+        if(x&&x.qty>0) g+=(x.qty*x.price);
+    });
+    let venueCut = 0;
+    if (s.venueCutType === 'amount') {
+        venueCut = parseFloat(s.venueCutAmount) || 0;
+    } else {
+        venueCut = g * ((s.venuePercent||0) / 100);
+    }
+    return g - venueCut;
+};
+
+const calcGross=(s)=>{
+    let g=0;
+    ALL_SELLABLE.forEach(i=>{
+        const x=s.sales?.[i.id];
+        if(x&&x.qty>0) g+=(x.qty*x.price);
+    });
+    return g;
+};
+
+const calcVenueCut=(s)=>{
+    if (s.venueCutType === 'amount') return parseFloat(s.venueCutAmount) || 0;
+    return calcGross(s) * ((s.venuePercent||0) / 100);
+};
+
+const toEUR = (amount, currency) => {
+    if (currency === 'EUR') return amount;
+    return amount * (eurRates[currency] ? (1/eurRates[currency]) : 1);
+};
+
+// =============== DASHBOARD ===============
 window.renderDashboard=()=>{
     const el=document.getElementById('view-dashboard');
     const tours=[...new Set(state.shows.map(s=>s.tour).filter(Boolean))].reverse();
     const selTour=state.ui.selectedOverviewTour==='CURRENT'?(tours[0]||""):state.ui.selectedOverviewTour;
-    let yr={net:0,cash:0,card:0,pp:0,shani:0},tr={net:0,cash:0,card:0,pp:0,shani:0},exp=0,trCur={},yrCur={};
-    state.shows.forEach(s=>{const cur=s.currency||'EUR';const rate=cur==='EUR'?1:(eurRates[cur]?(1/eurRates[cur]):1);const net=calcNet(s);const netE=net*rate;let g=0,m=0;ITEMS.forEach(i=>{const x=s.sales?.[i.id];if(x&&x.qty>0){const a=x.qty*x.price;g+=a;if(i.type==='merch')m+=a;}});const mn=m*(1-(s.venuePercent||0)/100);const dc=mn*((state.settings.designerPercent||0)/100)*rate;yr.net+=netE;yr.shani+=dc;yrCur[cur]=(yrCur[cur]||0)+net;const pm=s.paymentMethods||{cash:net,card:0,paypal:0};const ct=(pm.cash+pm.card+pm.paypal)||net;const sc=ct>0?(net/ct):0;yr.cash+=(pm.cash*sc)*rate;yr.card+=(pm.card*sc)*rate;yr.pp+=(pm.paypal*sc)*rate;if(s.tour===selTour){tr.net+=netE;tr.shani+=dc;tr.cash+=(pm.cash*sc)*rate;tr.card+=(pm.card*sc)*rate;tr.pp+=(pm.paypal*sc)*rate;trCur[cur]=(trCur[cur]||0)+net;}});
-    state.shipments.forEach(s=>{let c=parseFloat(s.shipping)||0;s.items.forEach(i=>c+=(i.qty*i.cost));exp+=c;});yr.net-=exp;
+    let yr={net:0,cash:0,card:0,pp:0},tr={net:0,cash:0,card:0,pp:0},exp=0,trCur={},yrCur={};
+
+    state.shows.forEach(s=>{
+        const cur=s.currency||'EUR';
+        const rate=cur==='EUR'?1:(eurRates[cur]?(1/eurRates[cur]):1);
+        const net=calcNet(s);
+        const netE=net*rate;
+        yr.net+=netE;
+        yrCur[cur]=(yrCur[cur]||0)+net;
+        const pm=s.paymentMethods||{cash:net,card:0,paypal:0};
+        const ct=(pm.cash+pm.card+pm.paypal)||net;
+        const sc=ct>0?(net/ct):0;
+        yr.cash+=(pm.cash*sc)*rate;
+        yr.card+=(pm.card*sc)*rate;
+        yr.pp+=(pm.paypal*sc)*rate;
+        if(s.tour===selTour){
+            tr.net+=netE;
+            tr.cash+=(pm.cash*sc)*rate;
+            tr.card+=(pm.card*sc)*rate;
+            tr.pp+=(pm.paypal*sc)*rate;
+            trCur[cur]=(trCur[cur]||0)+net;
+        }
+    });
+    state.shipments.forEach(s=>{let c=parseFloat(s.shipping)||0;s.items.forEach(i=>c+=(i.qty*i.cost));exp+=c;});
+    yr.net-=exp;
+
     const bkd=(o)=>`<div class="flex gap-3 text-[10px] font-bold text-slate-400 mt-2 bg-slate-900/50 px-3 py-2 rounded-lg border border-slate-700/50"><div><span class="text-green-400">Cash:</span> €${Math.round(o.cash).toLocaleString()}</div><div><span class="text-blue-400">Card:</span> €${Math.round(o.card).toLocaleString()}</div><div><span class="text-indigo-400">PP:</span> €${Math.round(o.pp).toLocaleString()}</div></div>`;
     const curBkd=(obj)=>{const e=Object.entries(obj);if(e.length<=1)return '';return `<div class="flex flex-wrap gap-2 mt-2 justify-center">${e.map(([c,a])=>`<span class="text-[10px] font-bold bg-slate-900/60 px-2 py-1 rounded-lg border border-slate-700/50 text-slate-300">${getSym(c)}${Math.round(a).toLocaleString()} <span class="text-slate-500">${c}</span></span>`).join('')}</div>`;};
-    const grp=[];let cg=null;[...state.shows].reverse().forEach(s=>{const tn=s.tour||"Individual Gig";if(!cg||cg.tn!==tn||tn==="Individual Gig"){cg={tn,shows:[]};grp.push(cg);}cg.shows.push(s);});
-    const actHtml=grp.map(g=>{const isI=g.tn==="Individual Gig";const ci=g.tn.split('').reduce((a,b)=>a+b.charCodeAt(0),0)%TC.length;const th=isI?{border:'border-slate-700',text:'text-slate-400',bg:'bg-slate-800',line:'hidden'}:TC[ci];if(isI){const s=g.shows[0];return `<div onclick="openGigModal(${s.id})" class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center active:scale-95 transition-transform cursor-pointer hover:border-blue-500/50 shadow-lg mb-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-400">${s.city.substring(0,2).toUpperCase()}</div><div class="text-left"><h3 class="font-bold text-white text-base leading-none mb-1">${s.city}</h3><p class="text-xs text-slate-400 font-bold">${s.venue}</p></div></div><div class="text-right"><span class="block text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded-full mb-1 inline-block">Single Gig</span><span class="block text-[10px] text-slate-500 font-mono font-bold">${s.date}</span></div></div>`;}
-    const col=state.ui.collapsedTours[g.tn];let ttn=0;g.shows.forEach(s=>{ttn+=calcNet(s)*(s.currency==='EUR'?1:(eurRates[s.currency]?(1/eurRates[s.currency]):1));});
-    const hd=`<div onclick="toggleTourCollapse('${g.tn}')" class="tour-header relative z-20 ${th.bg} border-l-4 ${th.border} p-3 rounded-r-xl mb-2 flex justify-between items-center shadow-md"><div><h3 class="text-xs font-black uppercase ${th.text} tracking-widest flex items-center gap-2"><i class="fas ${col?'fa-chevron-right':'fa-chevron-down'}"></i> ${g.tn}</h3><p class="text-[9px] text-slate-300 font-bold mt-1">${g.shows.length} Gigs • ${g.shows[g.shows.length-1].date} - ${g.shows[0].date}</p></div><div class="text-right"><span class="block text-sm font-extrabold text-white">€${Math.round(ttn).toLocaleString()}</span><span class="text-[9px] text-slate-400 uppercase font-bold">Total Net</span></div></div>`;
-    if(col)return hd;
-    const gh=g.shows.map((s,i)=>{const il=i===g.shows.length-1;return `<div class="relative pl-6 mb-2"><div class="absolute left-2.5 top-0 bottom-0 w-0.5 ${th.line} opacity-40 ${il?'h-1/2':''}"></div><div onclick="openGigModal(${s.id})" class="bg-slate-800 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center active:scale-95 transition-transform cursor-pointer relative z-10 hover:border-slate-500"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full ${th.bg} flex items-center justify-center font-bold text-[10px] ${th.text} border ${th.border}">${s.city.substring(0,2).toUpperCase()}</div><div><h4 class="font-bold text-white text-sm">${s.city}</h4><p class="text-[10px] text-slate-400">${s.venue}</p></div></div><div class="text-right"><span class="text-[10px] font-mono font-bold text-slate-500">${s.date}</span></div></div></div>`;}).join('');
-    return `<div class="mb-4">${hd}<div class="mt-1">${gh}</div></div>`;}).join('');
-    el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-4xl font-black text-white tracking-tighter mb-2 text-center">Overview</h2><div class="w-full card-modern bg-gradient-to-br from-indigo-900 to-slate-900 border-l-4 border-indigo-500 text-center"><div class="flex justify-between items-center mb-2"><h2 class="text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2"><i class="fas fa-route"></i> Tour Net</h2><select onchange="updateOverviewTour(this.value)" class="bg-slate-900 text-[10px] text-white border border-slate-700 rounded px-2 py-1 font-bold uppercase outline-none">${tours.length===0?'<option>No Tours</option>':''}${tours.map(t=>`<option value="${t}" ${t===selTour?'selected':''}>${t}</option>`).join('')}</select></div><div class="flex flex-col items-center"><span class="text-5xl font-extrabold text-white tracking-tight">€${tr.net.toLocaleString(undefined,{maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Net EUR (${selTour||'N/A'})</span>${curBkd(trCur)}<div class="mt-1 text-[10px] text-slate-500 font-bold">* After Shani's ${state.settings.designerPercent}% → €${Math.round(tr.shani).toLocaleString()}</div>${bkd(tr)}</div></div><div class="w-full card-modern bg-gradient-to-br from-slate-800 to-slate-900 border-l-4 border-l-green-500 text-center"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i class="fas fa-globe-europe text-green-500"></i> Yearly Net</h2><div class="flex flex-col items-center"><span class="text-4xl font-extrabold text-white tracking-tight">€${yr.net.toLocaleString(undefined,{maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Grand Total (EUR)</span>${curBkd(yrCur)}<div class="mt-1 text-[10px] text-slate-500 font-bold">* After Shani's ${state.settings.designerPercent}% → €${Math.round(yr.shani).toLocaleString()}</div>${bkd(yr)}</div></div><div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 text-center">Recent Activity</h2><div class="space-y-1">${actHtml}</div></div></div>`;
+
+    const grp=[];let cg=null;
+    [...state.shows].reverse().forEach(s=>{
+        const tn=s.tour||"Individual Gig";
+        if(!cg||cg.tn!==tn||tn==="Individual Gig"){cg={tn,shows:[]};grp.push(cg);}
+        cg.shows.push(s);
+    });
+
+    const actHtml=grp.map(g=>{
+        const isI=g.tn==="Individual Gig";
+        const ci=g.tn.split('').reduce((a,b)=>a+b.charCodeAt(0),0)%TC.length;
+        const th=isI?{border:'border-slate-700',text:'text-slate-400',bg:'bg-slate-800',line:'hidden'}:TC[ci];
+        if(isI){
+            const s=g.shows[0];
+            return `<div onclick="openGigModal(${s.id})" class="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center active:scale-95 transition-transform cursor-pointer hover:border-blue-500/50 shadow-lg mb-3"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-400">${s.city.substring(0,2).toUpperCase()}</div><div class="text-left"><h3 class="font-bold text-white text-base leading-none mb-1">${s.city}</h3><p class="text-xs text-slate-400 font-bold">${s.venue}</p></div></div><div class="text-right"><span class="block text-[10px] font-bold text-slate-500 bg-slate-900/50 px-2 py-0.5 rounded-full mb-1 inline-block">Single Gig</span><span class="block text-[10px] text-slate-500 font-mono font-bold">${s.date}</span></div></div>`;
+        }
+        const col=state.ui.collapsedTours[g.tn];
+        let ttn=0;
+        g.shows.forEach(s=>{ttn+=calcNet(s)*(s.currency==='EUR'?1:(eurRates[s.currency]?(1/eurRates[s.currency]):1));});
+        const hd=`<div onclick="toggleTourCollapse('${g.tn}')" class="tour-header relative z-20 ${th.bg} border-l-4 ${th.border} p-3 rounded-r-xl mb-2 flex justify-between items-center shadow-md"><div><h3 class="text-xs font-black uppercase ${th.text} tracking-widest flex items-center gap-2"><i class="fas ${col?'fa-chevron-right':'fa-chevron-down'}"></i> ${g.tn}</h3><p class="text-[9px] text-slate-300 font-bold mt-1">${g.shows.length} Gigs • ${g.shows[g.shows.length-1].date} - ${g.shows[0].date}</p></div><div class="text-right"><span class="block text-sm font-extrabold text-white">€${Math.round(ttn).toLocaleString()}</span><span class="text-[9px] text-slate-400 uppercase font-bold">Total Net</span></div></div>`;
+        if(col)return hd;
+        const gh=g.shows.map((s,i)=>{
+            const il=i===g.shows.length-1;
+            return `<div class="relative pl-6 mb-2"><div class="absolute left-2.5 top-0 bottom-0 w-0.5 ${th.line} opacity-40 ${il?'h-1/2':''}"></div><div onclick="openGigModal(${s.id})" class="bg-slate-800 p-3 rounded-xl border border-slate-700/50 flex justify-between items-center active:scale-95 transition-transform cursor-pointer relative z-10 hover:border-slate-500"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full ${th.bg} flex items-center justify-center font-bold text-[10px] ${th.text} border ${th.border}">${s.city.substring(0,2).toUpperCase()}</div><div><h4 class="font-bold text-white text-sm">${s.city}</h4><p class="text-[10px] text-slate-400">${s.venue}</p></div></div><div class="text-right"><span class="text-[10px] font-mono font-bold text-slate-500">${s.date}</span></div></div></div>`;
+        }).join('');
+        return `<div class="mb-4">${hd}<div class="mt-1">${gh}</div></div>`;
+    }).join('');
+
+    el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-4xl font-black text-white tracking-tighter mb-2 text-center">Overview</h2><div class="w-full card-modern bg-gradient-to-br from-indigo-900 to-slate-900 border-l-4 border-indigo-500 text-center"><div class="flex justify-between items-center mb-2"><h2 class="text-indigo-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2"><i class="fas fa-route"></i> Tour Net</h2><select onchange="updateOverviewTour(this.value)" class="bg-slate-900 text-[10px] text-white border border-slate-700 rounded px-2 py-1 font-bold uppercase outline-none">${tours.length===0?'<option>No Tours</option>':''}${tours.map(t=>`<option value="${t}" ${t===selTour?'selected':''}>${t}</option>`).join('')}</select></div><div class="flex flex-col items-center"><span class="text-5xl font-extrabold text-white tracking-tight">€${tr.net.toLocaleString(undefined,{maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Net EUR (${selTour||'N/A'})</span>${curBkd(trCur)}${bkd(tr)}</div></div><div class="w-full card-modern bg-gradient-to-br from-slate-800 to-slate-900 border-l-4 border-l-green-500 text-center"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1 flex items-center justify-center gap-2"><i class="fas fa-globe-europe text-green-500"></i> Yearly Net</h2><div class="flex flex-col items-center"><span class="text-4xl font-extrabold text-white tracking-tight">€${yr.net.toLocaleString(undefined,{maximumFractionDigits:0})}</span><span class="text-xs text-slate-500 font-bold uppercase mt-1">Grand Total (EUR, after shipping)</span>${curBkd(yrCur)}${bkd(yr)}</div></div><div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 text-center">Recent Activity</h2><div class="space-y-1">${actHtml}</div></div></div>`;
 };
 
-window.renderVendor=()=>{const el=document.getElementById('view-vendor');if(!state.vendorSession.active){el.innerHTML=`<div class="space-y-8 pb-24 flex flex-col items-center justify-center min-h-[60vh]"><h2 class="text-3xl font-extrabold text-white tracking-tight text-center">Vendor Mode</h2><div class="w-full space-y-6"><button onclick="renderVendorSetup()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-8 px-6 rounded-3xl shadow-2xl active:scale-95 text-xl flex flex-col items-center gap-2"><i class="fas fa-plus-circle text-4xl mb-1"></i>Setup New Sale</button></div></div>`;return;}const sales=state.vendorSession.sales,cur=state.vendorSession.meta.currency||'EUR',vp=state.vendorSession.meta.venuePercent||0;const cash=sales.filter(s=>s.method==='Cash').reduce((a,b)=>a+b.price,0),card=sales.filter(s=>s.method==='Card').reduce((a,b)=>a+b.price,0),pp=sales.filter(s=>s.method==='PayPal').reduce((a,b)=>a+b.price,0);const gross=cash+card+pp,vc=gross*(vp/100),net=gross-vc,counts={};sales.forEach(s=>counts[s.itemId]=(counts[s.itemId]||0)+1);el.innerHTML=`<div class="space-y-4 pb-32"><div class="flex justify-between items-center px-1 mb-2"><div><h2 class="text-2xl font-extrabold text-white">Active Sale</h2><p class="text-[10px] text-slate-400 font-bold uppercase">${state.vendorSession.meta.venue}, ${state.vendorSession.meta.city}</p></div><button onclick="undoVendorSale()" class="bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 active:scale-95"><i class="fas fa-undo mr-1"></i>Undo</button></div><div class="grid grid-cols-2 gap-3 z-0 relative">${ITEMS.map(item=>{const sold=counts[item.id]||0,init=state.vendorSession.stock[item.id]||0,price=state.vendorSession.prices[item.id]||0;return `<button onclick="promptPay('${item.id}',${price},'${cur}')" class="btn-vendor ${item.bg} border-2 ${item.border} relative z-0"><div class="text-3xl mb-1 ${item.color}"><i class="fas ${item.icon}"></i></div><div class="text-xs font-bold text-white leading-tight px-1 text-center mb-1 h-8 flex items-center justify-center">${item.label}</div><div class="text-3xl font-black text-white">${sold}<span class="text-lg text-slate-400">/${init}</span></div><div class="absolute top-2 right-2 text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white border border-white/10">${price}</div></button>`}).join('')}</div><div class="fixed bottom-24 left-0 w-full px-4 z-40"><div class="max-w-lg mx-auto bg-slate-900/95 backdrop-blur-xl border border-slate-600/50 rounded-3xl p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"><div class="grid grid-cols-3 gap-2 mb-4 text-center"><div class="bg-green-900/30 p-2 rounded-xl border border-green-500/20"><div class="text-[9px] text-green-400 uppercase font-bold mb-1">Cash</div><div class="text-xs font-bold text-white">${cash} ${cur}</div></div><div class="bg-blue-900/30 p-2 rounded-xl border border-blue-500/20"><div class="text-[9px] text-blue-400 uppercase font-bold mb-1">Card</div><div class="text-xs font-bold text-white">${card} ${cur}</div></div><div class="bg-indigo-900/30 p-2 rounded-xl border border-indigo-500/20"><div class="text-[9px] text-indigo-400 uppercase font-bold mb-1">PayPal</div><div class="text-xs font-bold text-white">${pp} ${cur}</div></div></div><div class="flex justify-between items-end mb-4 px-2 text-xs font-bold text-slate-400"><div>Gross: <span class="text-white">${gross}</span></div><div>Venue (${vp}%): <span class="text-red-400">-${vc.toFixed(0)}</span></div><div>Net: <span class="text-emerald-400 text-xl">${net.toFixed(0)}</span></div></div><button onclick="finishVendor()" class="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white font-black py-4 rounded-2xl active:scale-95 text-xl uppercase flex items-center justify-center gap-2"><i class="fas fa-flag-checkered"></i> FINISH</button></div></div></div>`;};
+// =============== VENDOR MODE ===============
+window.renderVendor=()=>{
+    const el=document.getElementById('view-vendor');
+    if(!state.vendorSession.active){
+        el.innerHTML=`<div class="space-y-8 pb-24 flex flex-col items-center justify-center min-h-[60vh]"><h2 class="text-3xl font-extrabold text-white tracking-tight text-center">Vendor Mode</h2><div class="w-full space-y-6"><button onclick="renderVendorSetup()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black py-8 px-6 rounded-3xl shadow-2xl active:scale-95 text-xl flex flex-col items-center gap-2"><i class="fas fa-plus-circle text-4xl mb-1"></i>Setup New Sale</button></div></div>`;
+        return;
+    }
+    const sales=state.vendorSession.sales,cur=state.vendorSession.meta.currency||'EUR';
+    const vcType = state.vendorSession.meta.venueCutType || 'percent';
+    const vp = state.vendorSession.meta.venuePercent || 0;
+    const vAmt = state.vendorSession.meta.venueCutAmount || 0;
 
-window.renderVendorSetup=()=>{const el=document.getElementById('view-vendor');el.innerHTML=`<div class="space-y-6 pb-24 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">New Sale Setup</h2><div class="w-full card-modern"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Event Details</h3><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Date</label><input type="date" id="v_date" class="input-modern text-xs" value="${new Date().toISOString().split('T')[0]}"></div><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">City</label><input type="text" id="v_city" class="input-modern text-xs"></div></div><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Venue</label><input type="text" id="v_venue" class="input-modern text-xs"></div><div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Currency</label><select id="v_cur" class="input-modern text-xs">${curOpts('EUR')}</select></div></div><div class="mb-6"><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Venue Cut %</label><input type="number" id="v_vp" class="input-modern text-xs" placeholder="0"></div><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Stock & Prices</h3><div class="space-y-3">${ITEMS.map(i=>`<div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center"><i class="fas ${i.icon} ${i.color}"></i></div><span class="font-bold text-xs text-white w-24 leading-tight">${i.label}</span></div><div class="flex gap-2"><input type="number" id="v_q_${i.id}" placeholder="Qty" class="input-modern py-1 text-center text-xs w-16"><input type="number" id="v_p_${i.id}" placeholder="Price" class="input-modern py-1 text-center text-xs w-20 font-bold" value="${state.settings.lastPrices[i.id]||''}"></div></div>`).join('')}</div><button onclick="startVendor()" class="btn-fun mt-8 w-full py-5 text-xl">Start Sale 🚀</button></div></div>`;};
-window.startVendor=()=>{const d=document.getElementById('v_date').value,ci=document.getElementById('v_city').value,ve=document.getElementById('v_venue').value,cu=document.getElementById('v_cur').value,vp=parseFloat(document.getElementById('v_vp').value)||0;if(!ci||!ve)return alert("Enter City and Venue");const st={},pr={};ITEMS.forEach(i=>{st[i.id]=parseInt(document.getElementById(`v_q_${i.id}`).value)||0;pr[i.id]=parseFloat(document.getElementById(`v_p_${i.id}`).value)||0;});state.vendorSession={active:true,stock:st,prices:pr,sales:[],meta:{date:d,city:ci,venue:ve,currency:cu,venuePercent:vp}};saveData();window.renderVendor();};
-window.promptPay=(itemId,price,cur)=>{if(!price){const np=prompt("Enter Price:");if(!np)return;price=parseFloat(np);state.vendorSession.prices[itemId]=price;saveData();}const item=getItem(itemId);document.getElementById('modalTitle').innerText=`Sold: ${item.label}`;document.getElementById('modalBody').innerHTML=`<div class="grid grid-cols-1 gap-3"><button onclick="recSale('${itemId}',${price},'Cash')" class="bg-green-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fas fa-money-bill-wave mr-2"></i>Cash</span><span>${price} ${cur}</span></button><button onclick="recSale('${itemId}',${price},'Card')" class="bg-blue-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fas fa-credit-card mr-2"></i>Card</span><span>${price} ${cur}</span></button><button onclick="recSale('${itemId}',${price},'PayPal')" class="bg-indigo-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fab fa-paypal mr-2"></i>PayPal</span><span>${price} ${cur}</span></button></div>`;document.getElementById('modalFooter').innerHTML=`<button onclick="closeModal()" class="w-full py-3 text-slate-400 font-bold uppercase">Cancel</button>`;document.getElementById('modalOverlay').classList.remove('hidden');setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);};
+    const cash=sales.filter(s=>s.method==='Cash').reduce((a,b)=>a+b.price,0);
+    const card=sales.filter(s=>s.method==='Card').reduce((a,b)=>a+b.price,0);
+    const pp=sales.filter(s=>s.method==='PayPal').reduce((a,b)=>a+b.price,0);
+    const gross=cash+card+pp;
+    const vc = vcType === 'amount' ? vAmt : gross * (vp/100);
+    const net=gross-vc;
+    const counts={};
+    sales.forEach(s=>counts[s.itemId]=(counts[s.itemId]||0)+1);
+
+    const renderBtn = (item) => {
+        const sold=counts[item.id]||0;
+        const init=state.vendorSession.stock[item.id]||0;
+        const price=state.vendorSession.prices[item.id]||0;
+        return `<button onclick="promptPay('${item.id}',${price},'${cur}')" class="btn-vendor ${item.bg} border-2 ${item.border} relative z-0">
+            <div class="text-3xl mb-1 ${item.color}"><i class="fas ${item.icon}"></i></div>
+            <div class="text-[11px] font-bold text-white leading-tight px-1 text-center mb-1 h-7 flex items-center justify-center">${item.shortLabel || item.label}</div>
+            <div class="text-2xl font-black text-white">${sold}<span class="text-base text-slate-400">/${init}</span></div>
+            <div class="absolute top-2 right-2 text-[10px] font-bold bg-black/40 px-2 py-1 rounded text-white border border-white/10">${price}</div>
+        </button>`;
+    };
+
+    const vcDisplay = vcType === 'amount' ? `Venue (${cur}${vAmt}): -${vc.toFixed(0)}` : `Venue (${vp}%): -${vc.toFixed(0)}`;
+
+    el.innerHTML=`<div class="space-y-4 pb-32"><div class="flex justify-between items-center px-1 mb-2"><div><h2 class="text-2xl font-extrabold text-white">Active Sale</h2><p class="text-[10px] text-slate-400 font-bold uppercase">${state.vendorSession.meta.venue}, ${state.vendorSession.meta.city}</p></div><button onclick="undoVendorSale()" class="bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 active:scale-95"><i class="fas fa-undo mr-1"></i>Undo</button></div>
+
+    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">Items</h3>
+    <div class="grid grid-cols-2 gap-3 z-0 relative">${ITEMS.map(renderBtn).join('')}</div>
+
+    <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest px-1 mt-4 flex items-center gap-2"><i class="fas fa-layer-group"></i> Bundles</h3>
+    <div class="grid grid-cols-3 gap-2 z-0 relative">${BUNDLES.map(b => {
+        const sold=counts[b.id]||0;
+        const init=state.vendorSession.stock[b.id]||0;
+        const price=state.vendorSession.prices[b.id]||0;
+        return `<button onclick="promptPay('${b.id}',${price},'${cur}')" class="btn-vendor ${b.bg} border-2 ${b.border} relative z-0" style="height:110px;">
+            <div class="text-2xl mb-1 ${b.color}"><i class="fas ${b.icon}"></i></div>
+            <div class="text-[10px] font-bold text-white leading-tight px-1 text-center mb-1">${b.shortLabel}</div>
+            <div class="text-xl font-black text-white">${sold}${init>0?`<span class="text-sm text-slate-400">/${init}</span>`:''}</div>
+            <div class="absolute top-1 right-1 text-[9px] font-bold bg-black/40 px-1.5 py-0.5 rounded text-white border border-white/10">${price}</div>
+        </button>`;
+    }).join('')}</div>
+
+    <div class="fixed bottom-24 left-0 w-full px-4 z-40"><div class="max-w-lg mx-auto bg-slate-900/95 backdrop-blur-xl border border-slate-600/50 rounded-3xl p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]"><div class="grid grid-cols-3 gap-2 mb-4 text-center"><div class="bg-green-900/30 p-2 rounded-xl border border-green-500/20"><div class="text-[9px] text-green-400 uppercase font-bold mb-1">Cash</div><div class="text-xs font-bold text-white">${cash} ${cur}</div></div><div class="bg-blue-900/30 p-2 rounded-xl border border-blue-500/20"><div class="text-[9px] text-blue-400 uppercase font-bold mb-1">Card</div><div class="text-xs font-bold text-white">${card} ${cur}</div></div><div class="bg-indigo-900/30 p-2 rounded-xl border border-indigo-500/20"><div class="text-[9px] text-indigo-400 uppercase font-bold mb-1">PayPal</div><div class="text-xs font-bold text-white">${pp} ${cur}</div></div></div><div class="flex justify-between items-end mb-4 px-2 text-xs font-bold text-slate-400"><div>Gross: <span class="text-white">${gross}</span></div><div>${vcDisplay.replace(/Venue.*?:/,(m)=>`<span class="text-red-400">${m}</span>`)}</div><div>Net: <span class="text-emerald-400 text-xl">${net.toFixed(0)}</span></div></div><button onclick="finishVendor()" class="w-full bg-gradient-to-r from-red-600 to-pink-600 text-white font-black py-4 rounded-2xl active:scale-95 text-xl uppercase flex items-center justify-center gap-2"><i class="fas fa-flag-checkered"></i> FINISH</button></div></div></div>`;
+};
+
+window.renderVendorSetup=()=>{
+    const el=document.getElementById('view-vendor');
+    el.innerHTML=`<div class="space-y-6 pb-24 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">New Sale Setup</h2>
+    <div class="w-full card-modern">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Event Details</h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Date</label><input type="date" id="v_date" class="input-modern text-xs" value="${new Date().toISOString().split('T')[0]}"></div>
+            <div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">City</label><input type="text" id="v_city" class="input-modern text-xs"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Venue</label><input type="text" id="v_venue" class="input-modern text-xs"></div>
+            <div><label class="text-[10px] text-slate-500 font-bold uppercase block mb-1">Currency</label><select id="v_cur" class="input-modern text-xs">${curOpts('EUR')}</select></div>
+        </div>
+        <div class="mb-6">
+            <label class="text-[10px] text-slate-500 font-bold uppercase block mb-2">Venue Cut</label>
+            <div class="flex items-center gap-2 mb-2">
+                <div class="toggle-pill">
+                    <button type="button" id="vt_pct" onclick="setVendorCutType('percent')" class="active">% Percent</button>
+                    <button type="button" id="vt_amt" onclick="setVendorCutType('amount')">Amount</button>
+                </div>
+            </div>
+            <div id="vt_pct_input" class="relative w-full"><input type="number" id="v_vp" class="input-modern text-xs pr-8" placeholder="0" min="0" max="100"><span class="input-group-text-overlay">%</span></div>
+            <div id="vt_amt_input" class="relative w-full hidden"><input type="number" id="v_vamt" class="input-modern text-xs" placeholder="0"></div>
+        </div>
+
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Stock & Prices — Items</h3>
+        <div class="space-y-3 mb-6">${ITEMS.map(i=>`<div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center"><i class="fas ${i.icon} ${i.color}"></i></div><span class="font-bold text-xs text-white w-24 leading-tight">${i.label}</span></div><div class="flex gap-2"><input type="number" id="v_q_${i.id}" placeholder="Qty" class="input-modern py-1 text-center text-xs w-16"><input type="number" id="v_p_${i.id}" placeholder="Price" class="input-modern py-1 text-center text-xs w-20 font-bold" value="${state.settings.lastPrices[i.id]||''}"></div></div>`).join('')}</div>
+
+        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i class="fas fa-layer-group"></i> Bundles (Prices Only)</h3>
+        <p class="text-[10px] text-slate-500 mb-3 italic">Bundle stock is automatic — drawn from component items.</p>
+        <div class="space-y-3">${BUNDLES.map(b=>`<div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center"><i class="fas ${b.icon} ${b.color}"></i></div><span class="font-bold text-xs text-white w-24 leading-tight">${b.label}</span></div><div class="flex gap-2"><input type="number" id="v_p_${b.id}" placeholder="Price" class="input-modern py-1 text-center text-xs w-20 font-bold" value="${state.settings.lastPrices[b.id]||''}"></div></div>`).join('')}</div>
+
+        <button onclick="startVendor()" class="btn-fun mt-8 w-full py-5 text-xl">Start Sale 🚀</button>
+    </div></div>`;
+};
+
+window.setVendorCutType = (type) => {
+    document.getElementById('vt_pct').classList.toggle('active', type === 'percent');
+    document.getElementById('vt_amt').classList.toggle('active', type === 'amount');
+    document.getElementById('vt_pct_input').classList.toggle('hidden', type !== 'percent');
+    document.getElementById('vt_amt_input').classList.toggle('hidden', type !== 'amount');
+};
+
+window.startVendor=()=>{
+    const d=document.getElementById('v_date').value;
+    const ci=document.getElementById('v_city').value;
+    const ve=document.getElementById('v_venue').value;
+    const cu=document.getElementById('v_cur').value;
+    const isPct = document.getElementById('vt_pct').classList.contains('active');
+    const vp = isPct ? (parseFloat(document.getElementById('v_vp').value)||0) : 0;
+    const vamt = !isPct ? (parseFloat(document.getElementById('v_vamt').value)||0) : 0;
+
+    if(!ci||!ve)return alert("Enter City and Venue");
+
+    const st={},pr={};
+    ITEMS.forEach(i=>{
+        st[i.id]=parseInt(document.getElementById(`v_q_${i.id}`).value)||0;
+        pr[i.id]=parseFloat(document.getElementById(`v_p_${i.id}`).value)||0;
+    });
+    BUNDLES.forEach(b=>{
+        // Bundle stock = min of component tour stock (computed live, not stored)
+        st[b.id]=0; // will be computed on render
+        pr[b.id]=parseFloat(document.getElementById(`v_p_${b.id}`).value)||0;
+    });
+
+    state.vendorSession={active:true,stock:st,prices:pr,sales:[],meta:{date:d,city:ci,venue:ve,currency:cu,venueCutType: isPct?'percent':'amount', venuePercent:vp, venueCutAmount:vamt}};
+    saveData();
+    window.renderVendor();
+};
+
+window.promptPay=(itemId,price,cur)=>{
+    if(!price){
+        const np=prompt("Enter Price:");
+        if(!np)return;
+        price=parseFloat(np);
+        state.vendorSession.prices[itemId]=price;
+        saveData();
+    }
+    const item=getSellable(itemId);
+    document.getElementById('modalTitle').innerText=`Sold: ${item.label}`;
+    document.getElementById('modalBody').innerHTML=`<div class="grid grid-cols-1 gap-3"><button onclick="recSale('${itemId}',${price},'Cash')" class="bg-green-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fas fa-money-bill-wave mr-2"></i>Cash</span><span>${price} ${cur}</span></button><button onclick="recSale('${itemId}',${price},'Card')" class="bg-blue-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fas fa-credit-card mr-2"></i>Card</span><span>${price} ${cur}</span></button><button onclick="recSale('${itemId}',${price},'PayPal')" class="bg-indigo-600 text-white font-bold py-4 rounded-xl text-lg flex justify-between px-6 items-center"><span><i class="fab fa-paypal mr-2"></i>PayPal</span><span>${price} ${cur}</span></button></div>`;
+    document.getElementById('modalFooter').innerHTML=`<button onclick="closeModal()" class="w-full py-3 text-slate-400 font-bold uppercase">Cancel</button>`;
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);
+};
+
 window.recSale=(id,p,m)=>{closeModal();state.vendorSession.sales.push({timestamp:Date.now(),itemId:id,price:p,method:m});saveData();window.renderVendor();showToast(`${m} Sale Recorded`,'fa-dollar-sign');};
 window.undoVendorSale=()=>{if(!state.vendorSession.sales.length)return showToast("Nothing to undo","fa-ban");state.vendorSession.sales.pop();saveData();window.renderVendor();showToast("Undone","fa-undo");};
-window.finishVendor=()=>{const sales=state.vendorSession.sales,agg={};let cash=0,card=0,pp=0;sales.forEach(s=>{if(s.method==='Cash')cash+=s.price;else if(s.method==='Card')card+=s.price;else pp+=s.price;agg[s.itemId]=(agg[s.itemId]||{qty:0,price:state.vendorSession.prices[s.itemId]});agg[s.itemId].qty++;});pendingVendorData={meta:state.vendorSession.meta,sales:agg,payments:{cash,card,paypal:pp}};state.vendorSession={active:false,stock:{},prices:{},sales:[],meta:{}};saveData();editingShowId=null;router('add-show');setTimeout(()=>alert("Vendor Sale Finished! Review and Save."),300);};
 
+window.finishVendor=()=>{
+    const sales=state.vendorSession.sales,agg={};
+    let cash=0,card=0,pp=0;
+    sales.forEach(s=>{
+        if(s.method==='Cash')cash+=s.price;
+        else if(s.method==='Card')card+=s.price;
+        else pp+=s.price;
+        agg[s.itemId]=(agg[s.itemId]||{qty:0,price:state.vendorSession.prices[s.itemId]});
+        agg[s.itemId].qty++;
+    });
+    pendingVendorData={meta:state.vendorSession.meta,sales:agg,payments:{cash,card,paypal:pp}};
+    state.vendorSession={active:false,stock:{},prices:{},sales:[],meta:{}};
+    saveData();
+    editingShowId=null;
+    router('add-show');
+    setTimeout(()=>alert("Vendor Sale Finished! Review and Save."),300);
+};
+
+// =============== ADD/EDIT SHOW ===============
 window.renderAddShow=()=>{
-    const el=document.getElementById('view-add-show');const tours=[...new Set(state.shows.map(s=>s.tour).filter(Boolean))].reverse();
+    const el=document.getElementById('view-add-show');
+    const tours=[...new Set(state.shows.map(s=>s.tour).filter(Boolean))].reverse();
     let ed=null;if(editingShowId)ed=state.shows.find(s=>s.id===editingShowId);
-    let dc='',dv='',dd=new Date().toISOString().split('T')[0],dcu='EUR',dvp='',pc='',pca='',pp='';
-    if(pendingVendorData){dc=pendingVendorData.meta.city;dv=pendingVendorData.meta.venue;dd=pendingVendorData.meta.date;dcu=pendingVendorData.meta.currency;dvp=pendingVendorData.meta.venuePercent;pc=pendingVendorData.payments.cash;pca=pendingVendorData.payments.card;pp=pendingVendorData.payments.paypal;}else if(ed){dc=ed.city;dv=ed.venue;dd=ed.date;dcu=ed.currency;dvp=ed.venuePercent;if(ed.paymentMethods){pc=ed.paymentMethods.cash;pca=ed.paymentMethods.card;pp=ed.paymentMethods.paypal;}}
+
+    let dc='',dv='',dd=new Date().toISOString().split('T')[0],dcu='EUR',dvp='',dvamt='',dvType='percent',pc='',pca='',pp='';
+    if(pendingVendorData){
+        dc=pendingVendorData.meta.city;
+        dv=pendingVendorData.meta.venue;
+        dd=pendingVendorData.meta.date;
+        dcu=pendingVendorData.meta.currency;
+        dvType=pendingVendorData.meta.venueCutType||'percent';
+        dvp=pendingVendorData.meta.venuePercent||'';
+        dvamt=pendingVendorData.meta.venueCutAmount||'';
+        pc=pendingVendorData.payments.cash;
+        pca=pendingVendorData.payments.card;
+        pp=pendingVendorData.payments.paypal;
+    } else if(ed){
+        dc=ed.city;dv=ed.venue;dd=ed.date;dcu=ed.currency;
+        dvType=ed.venueCutType||'percent';
+        dvp=ed.venuePercent||'';
+        dvamt=ed.venueCutAmount||'';
+        if(ed.paymentMethods){pc=ed.paymentMethods.cash;pca=ed.paymentMethods.card;pp=ed.paymentMethods.paypal;}
+    }
     const sym=getSym(dcu);
-    el.innerHTML=`<div class="space-y-6 pb-20"><h2 class="text-3xl font-extrabold text-white text-center">${editingShowId?'Edit Gig':'Log Gig'}</h2><form id="showForm" onsubmit="submitShow(event)" class="space-y-6"><div class="card-modern" id="logDetailsCard"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Details</h3><div id="tourBanner" class="${ed?'':'hidden'} mb-4 bg-indigo-500/20 border border-indigo-500/50 p-2 rounded-lg text-center"><span class="text-indigo-300 font-bold text-sm" id="tourDisp">${ed?ed.tour:''}</span></div><div class="mb-6"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Tour</label><div class="flex flex-col gap-3"><select id="tourSelect" onchange="handleTourSel(this)" class="input-modern"><option value="">Individual Gig</option>${tours.map(t=>`<option value="${t}" ${ed&&ed.tour===t?'selected':''}>${t}</option>`).join('')}<option value="NEW">+ Create New Tour</option></select><input type="text" id="newTourInput" name="newTour" placeholder="Enter New Tour Name" class="input-modern hidden border-blue-500"></div></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">City</label><input type="text" name="city" required class="input-modern" value="${dc}"></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue</label><input type="text" name="venue" required class="input-modern" value="${dv}"></div></div><div class="mt-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" name="date" required class="input-modern" value="${dd}"></div></div>
-    <div class="card-modern border-l-4 border-yellow-500"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Financials</h3><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Currency</label><select name="currency" id="gigCurrency" onchange="updateCurLabels(this.value)" class="input-modern">${curOpts(dcu)}</select></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue Cut</label><div class="relative w-full"><input type="number" name="venuePercent" placeholder="0" class="input-modern pr-8" min="0" max="100" value="${dvp}"><span class="input-group-text-overlay">%</span></div></div></div><div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50"><label class="text-xs text-slate-400 font-bold uppercase mb-2 block">Payment Totals</label><div class="grid grid-cols-3 gap-2"><div><label class="text-[9px] text-green-400 font-bold block mb-1">Cash</label><input type="number" name="pay_cash" placeholder="0" value="${pc}" class="input-modern text-xs text-center px-1"></div><div><label class="text-[9px] text-blue-400 font-bold block mb-1">Card</label><input type="number" name="pay_card" placeholder="0" value="${pca}" class="input-modern text-xs text-center px-1"></div><div><label class="text-[9px] text-indigo-400 font-bold block mb-1">PayPal</label><input type="number" name="pay_paypal" placeholder="0" value="${pp}" class="input-modern text-xs text-center px-1"></div></div></div></div>
-    <div class="card-modern"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Sales</h3><div class="space-y-1">${ITEMS.map(i=>{let q='',p='';if(ed&&ed.sales[i.id]){q=ed.sales[i.id].qty;p=ed.sales[i.id].price;}else if(pendingVendorData&&pendingVendorData.sales[i.id]){q=pendingVendorData.sales[i.id].qty;p=pendingVendorData.sales[i.id].price;}return `<div class="flex items-center gap-3 py-3 border-b border-slate-700/50 last:border-0"><div class="w-8 flex justify-center"><i class="fas ${i.icon} ${i.color} text-lg"></i></div><div class="flex-1"><p class="text-sm text-slate-200 font-bold mb-1">${i.label}</p><div class="flex gap-3"><input type="number" name="qty_${i.id}" placeholder="Qty" value="${q}" class="input-modern py-2 text-center w-24 font-extrabold text-black" min="0"><div class="relative flex-1"><span class="currency-label absolute left-3 top-2.5 text-slate-400 text-xs font-bold">${sym}</span><input type="number" step="0.01" name="price_${i.id}" placeholder="Price" value="${p}" class="input-modern py-2 pl-6 text-sm text-black" min="0"></div></div></div></div>`}).join('')}</div></div>
-    <div class="card-modern border-l-4 border-pink-500"><h3 class="text-xs font-bold text-pink-500 uppercase tracking-widest mb-4"><i class="fas fa-gift mr-1"></i> Freebies</h3><div class="space-y-2">${ITEMS.map(i=>`<div class="flex justify-between items-center"><label class="text-xs text-slate-300 font-bold w-1/2">${i.label}</label><input type="number" name="free_${i.id}" value="${ed&&ed.freebies[i.id]?ed.freebies[i.id]:''}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black" min="0"></div>`).join('')}</div></div>
-    <div class="pt-2 text-center"><button type="submit" class="btn-save-gig"><span>${ed?'Update Log':'Save Show Log'}</span> <i class="fas fa-arrow-right"></i></button></div></form></div>`;
+
+    const renderSaleRow = (i) => {
+        let q='',p='';
+        if(ed&&ed.sales[i.id]){q=ed.sales[i.id].qty;p=ed.sales[i.id].price;}
+        else if(pendingVendorData&&pendingVendorData.sales[i.id]){q=pendingVendorData.sales[i.id].qty;p=pendingVendorData.sales[i.id].price;}
+        const isB = isBundle(i.id);
+        return `<div class="flex items-center gap-3 py-3 border-b border-slate-700/50 last:border-0 ${isB?'bg-amber-500/5 -mx-2 px-2 rounded':''}"><div class="w-8 flex justify-center"><i class="fas ${i.icon} ${i.color} text-lg"></i></div><div class="flex-1"><p class="text-sm text-slate-200 font-bold mb-1">${i.label}${isB?' <span class="text-[9px] text-amber-400 font-bold uppercase">Bundle</span>':''}</p><div class="flex gap-3"><input type="number" name="qty_${i.id}" placeholder="Qty" value="${q}" class="input-modern py-2 text-center w-24 font-extrabold text-black" min="0"><div class="relative flex-1"><span class="currency-label absolute left-3 top-2.5 text-slate-400 text-xs font-bold">${sym}</span><input type="number" step="0.01" name="price_${i.id}" placeholder="Price" value="${p}" class="input-modern py-2 pl-6 text-sm text-black" min="0"></div></div></div></div>`;
+    };
+
+    el.innerHTML=`<div class="space-y-6 pb-20"><h2 class="text-3xl font-extrabold text-white text-center">${editingShowId?'Edit Gig':'Log Gig'}</h2><form id="showForm" onsubmit="submitShow(event)" class="space-y-6">
+
+    <div class="card-modern" id="logDetailsCard">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Details</h3>
+        <div id="tourBanner" class="${ed?'':'hidden'} mb-4 bg-indigo-500/20 border border-indigo-500/50 p-2 rounded-lg text-center"><span class="text-indigo-300 font-bold text-sm" id="tourDisp">${ed?ed.tour:''}</span></div>
+        <div class="mb-6"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Tour</label><div class="flex flex-col gap-3"><select id="tourSelect" onchange="handleTourSel(this)" class="input-modern"><option value="">Individual Gig</option>${tours.map(t=>`<option value="${t}" ${ed&&ed.tour===t?'selected':''}>${t}</option>`).join('')}<option value="NEW">+ Create New Tour</option></select><input type="text" id="newTourInput" name="newTour" placeholder="Enter New Tour Name" class="input-modern hidden border-blue-500"></div></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">City</label><input type="text" name="city" required class="input-modern" value="${dc}"></div>
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue</label><input type="text" name="venue" required class="input-modern" value="${dv}"></div>
+        </div>
+        <div class="mt-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" name="date" required class="input-modern" value="${dd}"></div>
+    </div>
+
+    <div class="card-modern border-l-4 border-yellow-500">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Financials</h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Currency</label><select name="currency" id="gigCurrency" onchange="updateCurLabels(this.value)" class="input-modern">${curOpts(dcu)}</select></div>
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue Cut Type</label>
+                <div class="toggle-pill mt-1">
+                    <button type="button" id="gt_pct" onclick="setGigCutType('percent')" class="${dvType==='percent'?'active':''}">%</button>
+                    <button type="button" id="gt_amt" onclick="setGigCutType('amount')" class="${dvType==='amount'?'active':''}">Amt</button>
+                </div>
+                <input type="hidden" name="venueCutType" id="gigCutTypeHidden" value="${dvType}">
+            </div>
+        </div>
+        <div id="gt_pct_wrap" class="${dvType==='percent'?'':'hidden'} mb-4">
+            <label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue Cut %</label>
+            <div class="relative w-full"><input type="number" name="venuePercent" placeholder="0" class="input-modern pr-8" min="0" max="100" value="${dvp}"><span class="input-group-text-overlay">%</span></div>
+        </div>
+        <div id="gt_amt_wrap" class="${dvType==='amount'?'':'hidden'} mb-4">
+            <label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Venue Cut Amount (in gig currency)</label>
+            <div class="relative w-full"><span class="absolute left-3 top-3 text-slate-500 font-bold currency-label">${sym}</span><input type="number" step="0.01" name="venueCutAmount" placeholder="0.00" class="input-modern pl-7" min="0" value="${dvamt}"></div>
+        </div>
+        <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
+            <label class="text-xs text-slate-400 font-bold uppercase mb-2 block">Payment Totals</label>
+            <div class="grid grid-cols-3 gap-2">
+                <div><label class="text-[9px] text-green-400 font-bold block mb-1">Cash</label><input type="number" name="pay_cash" placeholder="0" value="${pc}" class="input-modern text-xs text-center px-1"></div>
+                <div><label class="text-[9px] text-blue-400 font-bold block mb-1">Card</label><input type="number" name="pay_card" placeholder="0" value="${pca}" class="input-modern text-xs text-center px-1"></div>
+                <div><label class="text-[9px] text-indigo-400 font-bold block mb-1">PayPal</label><input type="number" name="pay_paypal" placeholder="0" value="${pp}" class="input-modern text-xs text-center px-1"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-modern">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Sales — Items</h3>
+        <div class="space-y-1">${ITEMS.map(renderSaleRow).join('')}</div>
+        <h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-4 mt-6 flex items-center gap-2"><i class="fas fa-layer-group"></i> Sales — Bundles</h3>
+        <div class="space-y-1">${BUNDLES.map(renderSaleRow).join('')}</div>
+    </div>
+
+    <div class="card-modern border-l-4 border-pink-500">
+        <h3 class="text-xs font-bold text-pink-500 uppercase tracking-widest mb-4"><i class="fas fa-gift mr-1"></i> Freebies</h3>
+        <div class="space-y-2">${ALL_SELLABLE.map(i=>`<div class="flex justify-between items-center"><label class="text-xs text-slate-300 font-bold w-1/2">${i.label}</label><input type="number" name="free_${i.id}" value="${ed&&ed.freebies&&ed.freebies[i.id]?ed.freebies[i.id]:''}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black" min="0"></div>`).join('')}</div>
+    </div>
+
+    <div class="pt-2 text-center"><button type="submit" class="btn-save-gig"><span>${ed?'Update Log':'Save Show Log'}</span> <i class="fas fa-arrow-right"></i></button></div>
+    </form></div>`;
+
     if(ed)handleTourSel(document.getElementById('tourSelect'));
 };
 
-window.renderLabel=()=>{const el=document.getElementById('view-label');const tih=tempShipmentItems.map((item,idx)=>{const d=getItem(item.itemId);return `<div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl mb-2 border border-slate-600"><span class="text-sm font-bold text-white">${d.label} <span class="text-blue-300">x${item.qty}</span></span><div class="flex items-center gap-2"><span class="text-xs text-slate-400">€${item.cost}/u</span><button onclick="removeTempItem(${idx})" class="text-red-400 bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button></div></div>`;}).join('');const isE=editingShipmentId!==null;el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Label</h2><div class="w-full max-w-md card-modern border-t-4 border-indigo-500"><h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 text-center">${isE?'Edit Shipment':'Log Shipment from Naive'}</h3><div class="grid grid-cols-2 gap-4 mb-4"><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" id="shp_date" class="input-modern text-sm" value="${new Date().toISOString().split('T')[0]}"></div><div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Invoice #</label><input type="text" id="shp_invoice" class="input-modern text-sm"></div></div><div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700 mb-4"><label class="text-xs text-slate-400 font-bold uppercase mb-2 block text-center">Add Items</label><div class="flex gap-2 mb-2"><select id="shp_temp_itemId" class="input-modern text-sm py-2 flex-grow">${ITEMS.map(i=>`<option value="${i.id}" ${i.id===lastLabelSelection?'selected':''}>${i.label}</option>`).join('')}</select><input type="number" id="shp_temp_qty" placeholder="Qty" class="input-modern text-sm py-2 w-20 text-center"></div><div class="flex gap-2 items-center"><input type="number" id="shp_temp_cost" placeholder="Cost/Unit (€)" class="input-modern text-sm py-2 flex-grow"><button onclick="addTempItem()" class="bg-indigo-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg">+</button></div></div><div class="mb-4">${tih}</div><div class="mb-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Shipping (€)</label><input type="number" id="shp_shipping" placeholder="0.00" class="input-modern font-bold"></div><div class="bg-slate-700/30 p-3 rounded-xl border border-slate-600/50 flex justify-between items-center mb-6"><div class="flex items-center gap-3"><input type="checkbox" id="shp_paid" onchange="togglePaidDate(this.checked)" class="w-6 h-6 rounded border-slate-500 bg-white"><label for="shp_paid" class="text-sm font-bold text-slate-300">Paid?</label></div><input type="date" id="shp_paidDate" class="input-modern text-sm w-32 hidden"></div><div class="text-center"><button onclick="saveShipment()" class="btn-fun text-lg w-full"><i class="fas fa-save"></i> ${isE?'Update':'Save'} Shipment</button>${isE?'<button onclick="resetShipmentForm()" class="w-full text-xs text-slate-500 mt-3 underline font-bold">Cancel</button>':''}</div></div><div class="w-full"><h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">History</h3><div class="space-y-2">${state.shipments.slice().reverse().map(s=>{let total=parseFloat(s.shipping)||0;s.items.forEach(i=>total+=(i.qty*i.cost));return `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700 active:scale-95 transition-transform"><div class="flex justify-between items-start cursor-pointer" onclick="openShipmentModal(${s.id})"><div><p class="text-white font-bold text-sm">Invoice: ${s.invoice}</p><p class="text-xs text-slate-500 font-bold">${s.date} • ${s.items.length} Items</p></div><div class="text-right"><p class="text-red-400 font-mono font-bold text-sm">-€${total.toFixed(2)}</p><div class="mt-1">${s.paid?`<i class="fas fa-check-circle text-green-500 text-sm"></i>`:`<span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30 font-bold">UNPAID</span>`}</div></div></div></div>`}).join('')}</div></div></div>`;document.getElementById('shp_temp_cost').addEventListener('keypress',e=>{if(e.key==='Enter')addTempItem();});if(isE){const s=state.shipments.find(x=>x.id===editingShipmentId);if(s){document.getElementById('shp_date').value=s.date;document.getElementById('shp_invoice').value=s.invoice;document.getElementById('shp_shipping').value=s.shipping;document.getElementById('shp_paid').checked=s.paid;togglePaidDate(s.paid);if(s.paid)document.getElementById('shp_paidDate').value=s.paidDate;}}};
+window.setGigCutType = (type) => {
+    document.getElementById('gt_pct').classList.toggle('active', type === 'percent');
+    document.getElementById('gt_amt').classList.toggle('active', type === 'amount');
+    document.getElementById('gt_pct_wrap').classList.toggle('hidden', type !== 'percent');
+    document.getElementById('gt_amt_wrap').classList.toggle('hidden', type !== 'amount');
+    document.getElementById('gigCutTypeHidden').value = type;
+};
 
-window.renderTourStock=()=>{const el=document.getElementById('view-tour-stock');const c=getTourCap();const vb=c.vOver?'bg-red-500':c.vPct>80?'bg-amber-500':'bg-indigo-500';const cb=c.cOver?'bg-red-500':c.cPct>80?'bg-amber-500':'bg-cyan-400';el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Tour Stock</h2><div class="w-full card-modern bg-gradient-to-br from-amber-900/20 to-slate-800 border-l-4 border-amber-500"><h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-suitcase-rolling"></i> Suitcase</h3><div class="space-y-3"><div><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-indigo-300"><i class="fas fa-record-vinyl text-[10px]"></i> Vinyl</span><span class="text-xs font-extrabold ${c.vOver?'text-red-400 animate-pulse':'text-white'}">${c.vinyl}/${c.vMax}</span></div><div class="capacity-bar"><div class="capacity-fill ${vb}" style="width:${c.vPct}%"></div></div>${c.vOver?`<p class="text-[10px] text-red-400 font-bold mt-1">OVER by ${c.vinyl-c.vMax}!</p>`:''}</div><div><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-cyan-300"><i class="fas fa-compact-disc text-[10px]"></i> CD</span><span class="text-xs font-extrabold ${c.cOver?'text-red-400 animate-pulse':'text-white'}">${c.cd}/${c.cMax}</span></div><div class="capacity-bar"><div class="capacity-fill ${cb}" style="width:${c.cPct}%"></div></div>${c.cOver?`<p class="text-[10px] text-red-400 font-bold mt-1">OVER by ${c.cd-c.cMax}!</p>`:''}</div></div></div><div class="w-full card-modern bg-gradient-to-br from-blue-900/40 to-slate-800 border-l-4 border-blue-500 text-center"><h3 class="text-sm font-bold text-blue-400 mb-1 flex items-center justify-center gap-2"><i class="fas fa-shuttle-van"></i> Tour Logistics</h3><p class="text-xs text-slate-400 mb-4">Move stock between Warehouse & Bus</p><div class="grid grid-cols-2 gap-4"><button onclick="toggleTransferForm('TO_TOUR')" class="btn-secondary border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-out-alt text-2xl text-blue-400"></i><span class="text-xs font-bold uppercase mt-1">Load Bus</span></div></button><button onclick="toggleTransferForm('TO_HOME')" class="btn-secondary border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-in-alt text-2xl text-green-400"></i><span class="text-xs font-bold uppercase mt-1">Unload</span></div></button></div><div id="transferFormContainer" class="hidden mt-6 bg-slate-900 p-4 rounded-xl border border-slate-700 text-left"><h4 id="transferTitle" class="text-white font-bold text-sm uppercase mb-4 text-center border-b border-slate-800 pb-2">Transfer</h4><form onsubmit="submitTransfer(event)" id="transferForm"><input type="hidden" name="transferType" id="transferType"><div class="mb-4"><label class="text-xs text-slate-500 font-bold block mb-1">Date</label><input type="date" name="transferDate" required class="input-modern" value="${new Date().toISOString().split('T')[0]}"></div><div class="space-y-3 mb-5 max-h-60 overflow-y-auto no-scrollbar">${ITEMS.map(i=>`<div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg"><div class="flex items-center gap-2"><i class="fas ${i.icon} ${i.color} w-5 text-center"></i><label class="text-xs text-slate-300 font-bold">${i.label}</label></div><input type="number" name="t_qty_${i.id}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black"></div>`).join('')}</div><button type="submit" class="btn-fun text-lg"><i class="fas fa-check-circle"></i> Confirm</button></form></div></div><div class="w-full"><div class="grid grid-cols-1 gap-3">${ITEMS.map(i=>{const l=getStockLevels(i.id);const lo=l.tour<=20;return `<div class="bg-slate-800 p-4 rounded-xl border ${lo?'border-red-500/50':'border-slate-700'} shadow-md flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-lg ${i.bg} ${i.border} border flex items-center justify-center"><i class="fas ${i.icon} ${i.color} text-lg"></i></div><div><span class="text-sm font-bold text-slate-200">${i.label}</span>${lo?'<br><span class="text-[10px] text-red-400 font-bold animate-pulse">Low!</span>':''}</div></div><div class="flex items-center gap-6"><div class="flex flex-col items-center"><span class="text-[10px] text-blue-400 font-bold uppercase">Bus</span><span class="text-2xl font-extrabold ${lo?'text-red-400':'text-blue-400'}">${l.tour}</span></div><div class="w-px h-8 bg-slate-700"></div><div class="flex flex-col items-center"><span class="text-[10px] text-slate-500 font-bold uppercase">Home</span><span class="text-lg font-bold text-slate-400">${l.home}</span></div></div></div>`}).join('')}</div></div></div>`;};
+// =============== LABEL (SHIPMENTS) ===============
+window.renderLabel=()=>{
+    const el=document.getElementById('view-label');
+    const tih=tempShipmentItems.map((item,idx)=>{
+        const d=getItem(item.itemId);
+        return `<div class="flex justify-between items-center bg-slate-700/50 p-3 rounded-xl mb-2 border border-slate-600"><span class="text-sm font-bold text-white">${d.label} <span class="text-blue-300">x${item.qty}</span></span><div class="flex items-center gap-2"><span class="text-xs text-slate-400">€${item.cost}/u</span><button onclick="removeTempItem(${idx})" class="text-red-400 bg-slate-800 w-8 h-8 rounded-full flex items-center justify-center"><i class="fas fa-times"></i></button></div></div>`;
+    }).join('');
+    const isE=editingShipmentId!==null;
 
-window.renderInventory=()=>{const el=document.getElementById('view-inventory');const ss=ITEMS.filter(i=>state.inventory[i.id]>0).map(i=>`${i.label}: ${state.inventory[i.id]}`).join(', ')||"No stock set";const rl=ITEMS.filter(i=>{const l=getStockLevels(i.id);return l.home<i.lowThreshold;});el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Home Stock</h2>${rl.length>0?`<div class="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-xl"><h3 class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> Reorder</h3><div class="space-y-1">${rl.map(i=>`<div class="flex justify-between text-sm text-slate-300"><span>${i.label}</span><span class="font-bold text-red-400">< ${i.lowThreshold}</span></div>`).join('')}</div></div>`:''}<div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 text-center">Live Count</h2><div class="grid grid-cols-2 gap-3">${ITEMS.map(i=>{const l=getStockLevels(i.id);const lo=l.home<i.lowThreshold;return `<div class="bg-slate-800 p-3 rounded-xl border ${lo?'border-red-500/30':'border-slate-700'} flex flex-col items-center"><span class="text-xs text-slate-400 font-bold mb-1 text-center leading-tight">${i.label}</span><span class="text-xl font-extrabold ${lo?'text-red-400':'text-white'}" id="homeVal_${i.id}">${l.home}</span></div>`}).join('')}</div></div><div class="w-full card-modern"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Initial Master Stock</h3>${state.ui.masterStockCollapsed?`<button onclick="toggleMasterStock(false)" class="text-[10px] bg-slate-700 text-white px-2 py-1 rounded font-bold uppercase">Edit</button>`:`<button onclick="toggleMasterStock(true)" class="text-[10px] bg-slate-700 text-white px-2 py-1 rounded font-bold uppercase">Done</button>`}</div>${state.ui.masterStockCollapsed?`<div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"><p class="text-xs text-slate-400 font-mono truncate leading-relaxed">${ss}</p></div>`:`<div class="space-y-3">${ITEMS.map(i=>`<div class="flex justify-between items-center border-b border-slate-700/30 pb-2"><label class="text-sm text-slate-300 font-bold flex items-center gap-3"><div class="w-6 h-6 rounded bg-slate-700 flex items-center justify-center"><i class="fas ${i.icon} ${i.color} text-xs"></i></div>${i.label}</label><input type="number" value="${state.inventory[i.id]}" oninput="updateInitialStock('${i.id}',this.value)" class="input-modern w-24 text-center py-1 text-black font-extrabold"></div>`).join('')}<button onclick="toggleMasterStock(true)" class="btn-primary mt-3 py-2 text-sm">Done</button></div>`}</div></div>`;};
+    el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Label</h2>
+    <div class="w-full max-w-md card-modern border-t-4 border-indigo-500">
+        <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 text-center">${isE?'Edit Shipment':'Log Shipment from Naive'}</h3>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Date</label><input type="date" id="shp_date" class="input-modern text-sm" value="${new Date().toISOString().split('T')[0]}"></div>
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Invoice #</label><input type="text" id="shp_invoice" class="input-modern text-sm"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Ship To — City</label><input type="text" id="shp_city" placeholder="Paris" class="input-modern text-sm"></div>
+            <div><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Ship To — Country</label><input type="text" id="shp_country" placeholder="FR" class="input-modern text-sm"></div>
+        </div>
+        <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700 mb-4">
+            <label class="text-xs text-slate-400 font-bold uppercase mb-2 block text-center">Add Items</label>
+            <div class="flex gap-2 mb-2">
+                <select id="shp_temp_itemId" class="input-modern text-sm py-2 flex-grow">${ITEMS.map(i=>`<option value="${i.id}" ${i.id===lastLabelSelection?'selected':''}>${i.label}</option>`).join('')}</select>
+                <input type="number" id="shp_temp_qty" placeholder="Qty" class="input-modern text-sm py-2 w-20 text-center">
+            </div>
+            <div class="flex gap-2 items-center">
+                <input type="number" step="0.01" id="shp_temp_cost" placeholder="Cost/Unit (€)" class="input-modern text-sm py-2 flex-grow">
+                <button onclick="addTempItem()" class="bg-indigo-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg">+</button>
+            </div>
+        </div>
+        <div class="mb-4">${tih}</div>
+        <div class="mb-4"><label class="text-xs text-slate-500 font-bold ml-1 mb-1 block">Shipping (€)</label><input type="number" step="0.01" id="shp_shipping" placeholder="0.00" class="input-modern font-bold"></div>
+        <div class="bg-slate-700/30 p-3 rounded-xl border border-slate-600/50 flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3"><input type="checkbox" id="shp_paid" onchange="togglePaidDate(this.checked)" class="w-6 h-6 rounded border-slate-500 bg-white"><label for="shp_paid" class="text-sm font-bold text-slate-300">Paid?</label></div>
+            <input type="date" id="shp_paidDate" class="input-modern text-sm w-32 hidden">
+        </div>
+        <div class="text-center">
+            <button onclick="saveShipment()" class="btn-fun text-lg w-full"><i class="fas fa-save"></i> ${isE?'Update':'Save'} Shipment</button>
+            ${isE?'<button onclick="resetShipmentForm()" class="w-full text-xs text-slate-500 mt-3 underline font-bold">Cancel</button>':''}
+        </div>
+    </div>
+    <div class="w-full">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 text-center">History</h3>
+        <div class="space-y-2">${state.shipments.slice().reverse().map(s=>{
+            let total=parseFloat(s.shipping)||0;
+            s.items.forEach(i=>total+=(i.qty*i.cost));
+            const loc = s.shipCity||s.shipCountry ? `${s.shipCity||''}${s.shipCity&&s.shipCountry?', ':''}${s.shipCountry||''}` : 'No location';
+            return `<div class="bg-slate-800 p-4 rounded-xl border border-slate-700 active:scale-95 transition-transform"><div class="flex justify-between items-start cursor-pointer" onclick="openShipmentModal(${s.id})"><div><p class="text-white font-bold text-sm">Invoice: ${s.invoice||'—'}</p><p class="text-xs text-slate-500 font-bold">${s.date} • ${s.items.length} Items</p><p class="text-[10px] text-blue-400 font-bold mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${loc}</p></div><div class="text-right"><p class="text-red-400 font-mono font-bold text-sm">-€${total.toFixed(2)}</p><div class="mt-1">${s.paid?`<i class="fas fa-check-circle text-green-500 text-sm"></i>`:`<span class="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30 font-bold">UNPAID</span>`}</div></div></div></div>`;
+        }).join('')}</div>
+    </div></div>`;
 
-window.renderSettings=()=>{const el=document.getElementById('view-settings');el.innerHTML=`<div class="space-y-6 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Settings</h2><div class="w-full card-modern"><label class="block text-xs text-slate-400 font-bold uppercase tracking-widest mb-3">Designer (Shani)</label><div class="flex items-center gap-3"><input type="number" value="${state.settings.designerPercent}" onchange="updateSetting('designerPercent',this.value)" class="input-modern w-32 text-center text-xl font-extrabold text-black"><span class="text-slate-500 font-bold">%</span></div><p class="text-[10px] text-slate-500 mt-2 italic">* Posters, Totes, Postcards only</p></div><div class="w-full card-modern border-l-4 border-amber-500"><label class="block text-xs text-amber-400 font-bold uppercase tracking-widest mb-3"><i class="fas fa-suitcase-rolling mr-1"></i> Suitcase</label><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max Vinyl</label><input type="number" value="${SUITCASE_LIMITS.vinyl}" onchange="SUITCASE_LIMITS.vinyl=parseInt(this.value)||40" class="input-modern text-center text-lg font-extrabold text-black"></div><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max CD</label><input type="number" value="${SUITCASE_LIMITS.cd}" onchange="SUITCASE_LIMITS.cd=parseInt(this.value)||100" class="input-modern text-center text-lg font-extrabold text-black"></div></div></div><div class="w-full card-modern border-l-4 border-yellow-500"><label class="block text-xs text-yellow-500 font-bold uppercase tracking-widest mb-3"><i class="fas fa-bell"></i> Low Stock Alerts</label><input type="email" placeholder="your@email.com" value="${state.settings.email||''}" onchange="updateSetting('email',this.value)" class="input-modern text-sm"></div><div class="w-full card-modern border-l-4 border-green-500"><h3 class="text-xs font-bold text-green-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-file-excel"></i> Export</h3><div class="grid grid-cols-2 gap-3"><button onclick="exportCSV()" class="btn-secondary py-3 text-xs">All Year CSV</button><button onclick="exportPDF()" class="btn-secondary py-3 text-xs bg-red-600 hover:bg-red-500">Backup PDF</button></div></div><div class="pt-10 pb-10"><button onclick="if(confirm('Wipe all data?')){localStorage.removeItem(DB_KEY);location.reload();}" class="text-red-500/50 text-xs w-full text-center hover:text-red-500 hover:underline font-bold uppercase tracking-widest">Reset App Data</button></div></div>`;};
+    document.getElementById('shp_temp_cost').addEventListener('keypress',e=>{if(e.key==='Enter')addTempItem();});
+    if(isE){
+        const s=state.shipments.find(x=>x.id===editingShipmentId);
+        if(s){
+            document.getElementById('shp_date').value=s.date;
+            document.getElementById('shp_invoice').value=s.invoice||'';
+            document.getElementById('shp_city').value=s.shipCity||'';
+            document.getElementById('shp_country').value=s.shipCountry||'';
+            document.getElementById('shp_shipping').value=s.shipping;
+            document.getElementById('shp_paid').checked=s.paid;
+            togglePaidDate(s.paid);
+            if(s.paid)document.getElementById('shp_paidDate').value=s.paidDate||'';
+        }
+    }
+};
 
+// =============== TOUR STOCK ===============
+window.renderTourStock=()=>{
+    const el=document.getElementById('view-tour-stock');
+    const c=getTourCap();
+    const vb=c.vOver?'bg-red-500':c.vPct>80?'bg-amber-500':'bg-indigo-500';
+    const cb=c.cOver?'bg-red-500':c.cPct>80?'bg-amber-500':'bg-cyan-400';
+    el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Tour Stock</h2><div class="w-full card-modern bg-gradient-to-br from-amber-900/20 to-slate-800 border-l-4 border-amber-500"><h3 class="text-xs font-bold text-amber-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-suitcase-rolling"></i> Suitcase</h3><div class="space-y-3"><div><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-indigo-300"><i class="fas fa-record-vinyl text-[10px]"></i> Vinyl</span><span class="text-xs font-extrabold ${c.vOver?'text-red-400 animate-pulse':'text-white'}">${c.vinyl}/${c.vMax}</span></div><div class="capacity-bar"><div class="capacity-fill ${vb}" style="width:${c.vPct}%"></div></div>${c.vOver?`<p class="text-[10px] text-red-400 font-bold mt-1">OVER by ${c.vinyl-c.vMax}!</p>`:''}</div><div><div class="flex justify-between items-center mb-1"><span class="text-xs font-bold text-cyan-300"><i class="fas fa-compact-disc text-[10px]"></i> CD</span><span class="text-xs font-extrabold ${c.cOver?'text-red-400 animate-pulse':'text-white'}">${c.cd}/${c.cMax}</span></div><div class="capacity-bar"><div class="capacity-fill ${cb}" style="width:${c.cPct}%"></div></div>${c.cOver?`<p class="text-[10px] text-red-400 font-bold mt-1">OVER by ${c.cd-c.cMax}!</p>`:''}</div></div></div><div class="w-full card-modern bg-gradient-to-br from-blue-900/40 to-slate-800 border-l-4 border-blue-500 text-center"><h3 class="text-sm font-bold text-blue-400 mb-1 flex items-center justify-center gap-2"><i class="fas fa-shuttle-van"></i> Tour Logistics</h3><p class="text-xs text-slate-400 mb-4">Move stock between Warehouse & Bus</p><div class="grid grid-cols-2 gap-4"><button onclick="toggleTransferForm('TO_TOUR')" class="btn-secondary border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-out-alt text-2xl text-blue-400"></i><span class="text-xs font-bold uppercase mt-1">Load Bus</span></div></button><button onclick="toggleTransferForm('TO_HOME')" class="btn-secondary border-0 h-auto py-5"><div class="flex flex-col items-center gap-1"><i class="fas fa-sign-in-alt text-2xl text-green-400"></i><span class="text-xs font-bold uppercase mt-1">Unload</span></div></button></div><div id="transferFormContainer" class="hidden mt-6 bg-slate-900 p-4 rounded-xl border border-slate-700 text-left"><h4 id="transferTitle" class="text-white font-bold text-sm uppercase mb-4 text-center border-b border-slate-800 pb-2">Transfer</h4><form onsubmit="submitTransfer(event)" id="transferForm"><input type="hidden" name="transferType" id="transferType"><div class="mb-4"><label class="text-xs text-slate-500 font-bold block mb-1">Date</label><input type="date" name="transferDate" required class="input-modern" value="${new Date().toISOString().split('T')[0]}"></div><div class="space-y-3 mb-5 max-h-60 overflow-y-auto no-scrollbar">${ITEMS.map(i=>`<div class="flex justify-between items-center bg-slate-800 p-2 rounded-lg"><div class="flex items-center gap-2"><i class="fas ${i.icon} ${i.color} w-5 text-center"></i><label class="text-xs text-slate-300 font-bold">${i.label}</label></div><input type="number" name="t_qty_${i.id}" placeholder="0" class="input-modern py-1 px-2 text-center w-20 text-sm font-bold text-black"></div>`).join('')}</div><button type="submit" class="btn-fun text-lg"><i class="fas fa-check-circle"></i> Confirm</button></form></div></div><div class="w-full"><div class="grid grid-cols-1 gap-3">${ITEMS.map(i=>{const l=getStockLevels(i.id);const lo=l.tour<=20;return `<div class="bg-slate-800 p-4 rounded-xl border ${lo?'border-red-500/50':'border-slate-700'} shadow-md flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 rounded-lg ${i.bg} ${i.border} border flex items-center justify-center"><i class="fas ${i.icon} ${i.color} text-lg"></i></div><div><span class="text-sm font-bold text-slate-200">${i.label}</span>${lo?'<br><span class="text-[10px] text-red-400 font-bold animate-pulse">Low!</span>':''}</div></div><div class="flex items-center gap-6"><div class="flex flex-col items-center"><span class="text-[10px] text-blue-400 font-bold uppercase">Bus</span><span class="text-2xl font-extrabold ${lo?'text-red-400':'text-blue-400'}">${l.tour}</span></div><div class="w-px h-8 bg-slate-700"></div><div class="flex flex-col items-center"><span class="text-[10px] text-slate-500 font-bold uppercase">Home</span><span class="text-lg font-bold text-slate-400">${l.home}</span></div></div></div>`;}).join('')}</div></div></div>`;
+};
+
+// =============== INVENTORY ===============
+window.renderInventory=()=>{
+    const el=document.getElementById('view-inventory');
+    const ss=ITEMS.filter(i=>state.inventory[i.id]>0).map(i=>`${i.label}: ${state.inventory[i.id]}`).join(', ')||"No stock set";
+    const rl=ITEMS.filter(i=>{const l=getStockLevels(i.id);return l.home<i.lowThreshold;});
+    el.innerHTML=`<div class="space-y-6 pb-20 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Home Stock</h2>${rl.length>0?`<div class="w-full bg-red-500/10 border border-red-500/30 p-4 rounded-xl"><h3 class="text-xs font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2"><i class="fas fa-exclamation-circle"></i> Reorder</h3><div class="space-y-1">${rl.map(i=>`<div class="flex justify-between text-sm text-slate-300"><span>${i.label}</span><span class="font-bold text-red-400">< ${i.lowThreshold}</span></div>`).join('')}</div></div>`:''}<div class="w-full"><h2 class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3 text-center">Live Count</h2><div class="grid grid-cols-2 gap-3">${ITEMS.map(i=>{const l=getStockLevels(i.id);const lo=l.home<i.lowThreshold;return `<div class="bg-slate-800 p-3 rounded-xl border ${lo?'border-red-500/30':'border-slate-700'} flex flex-col items-center"><span class="text-xs text-slate-400 font-bold mb-1 text-center leading-tight">${i.label}</span><span class="text-xl font-extrabold ${lo?'text-red-400':'text-white'}" id="homeVal_${i.id}">${l.home}</span></div>`;}).join('')}</div></div><div class="w-full card-modern"><div class="flex justify-between items-center mb-4"><h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Initial Master Stock</h3>${state.ui.masterStockCollapsed?`<button onclick="toggleMasterStock(false)" class="text-[10px] bg-slate-700 text-white px-2 py-1 rounded font-bold uppercase">Edit</button>`:`<button onclick="toggleMasterStock(true)" class="text-[10px] bg-slate-700 text-white px-2 py-1 rounded font-bold uppercase">Done</button>`}</div>${state.ui.masterStockCollapsed?`<div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50"><p class="text-xs text-slate-400 font-mono truncate leading-relaxed">${ss}</p></div>`:`<div class="space-y-3">${ITEMS.map(i=>`<div class="flex justify-between items-center border-b border-slate-700/30 pb-2"><label class="text-sm text-slate-300 font-bold flex items-center gap-3"><div class="w-6 h-6 rounded bg-slate-700 flex items-center justify-center"><i class="fas ${i.icon} ${i.color} text-xs"></i></div>${i.label}</label><input type="number" value="${state.inventory[i.id]}" oninput="updateInitialStock('${i.id}',this.value)" class="input-modern w-24 text-center py-1 text-black font-extrabold"></div>`).join('')}<button onclick="toggleMasterStock(true)" class="btn-primary mt-3 py-2 text-sm">Done</button></div>`}</div></div>`;
+};
+
+// =============== SETTINGS ===============
+window.renderSettings=()=>{
+    const el=document.getElementById('view-settings');
+    let ratesAge, ratesColor;
+    if (ratesUpdatedAt) {
+        const ageMs = Date.now() - ratesUpdatedAt.getTime();
+        const ageHours = ageMs / (1000*60*60);
+        const ageDays = ageHours / 24;
+        if (ageMs < 60000) ratesAge = 'Just now';
+        else if (ageHours < 1) ratesAge = `${Math.round(ageMs/60000)} min ago`;
+        else if (ageDays < 1) ratesAge = `${Math.round(ageHours)}h ago`;
+        else ratesAge = `${Math.round(ageDays)}d ago`;
+        ratesColor = ageDays < 1 ? 'text-green-400' : ageDays < 7 ? 'text-amber-400' : 'text-red-400';
+    } else {
+        ratesAge = 'Using built-in fallback rates';
+        ratesColor = 'text-amber-400';
+    }
+    el.innerHTML=`<div class="space-y-6 flex flex-col items-center"><h2 class="text-3xl font-extrabold text-white text-center">Settings</h2>
+    <div class="w-full card-modern border-l-4 border-amber-500"><label class="block text-xs text-amber-400 font-bold uppercase tracking-widest mb-3"><i class="fas fa-suitcase-rolling mr-1"></i> Suitcase</label><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max Vinyl</label><input type="number" value="${SUITCASE_LIMITS.vinyl}" onchange="SUITCASE_LIMITS.vinyl=parseInt(this.value)||40" class="input-modern text-center text-lg font-extrabold text-black"></div><div><label class="text-[10px] text-slate-500 font-bold block mb-1">Max CD</label><input type="number" value="${SUITCASE_LIMITS.cd}" onchange="SUITCASE_LIMITS.cd=parseInt(this.value)||100" class="input-modern text-center text-lg font-extrabold text-black"></div></div></div>
+    <div class="w-full card-modern border-l-4 border-yellow-500"><label class="block text-xs text-yellow-500 font-bold uppercase tracking-widest mb-3"><i class="fas fa-bell"></i> Low Stock Alerts</label><input type="email" placeholder="your@email.com" value="${state.settings.email||''}" onchange="updateSetting('email',this.value)" class="input-modern text-sm"></div>
+    <div class="w-full card-modern border-l-4 border-blue-500"><label class="block text-xs text-blue-400 font-bold uppercase tracking-widest mb-2"><i class="fas fa-coins mr-1"></i> Exchange Rates</label><p class="text-xs ${ratesColor} font-bold">${ratesAge}</p>${ratesUpdatedAt?`<p class="text-[10px] text-slate-500 mt-1">${ratesUpdatedAt.toLocaleString()}</p>`:''}<button onclick="refreshRates(this)" class="mt-3 bg-slate-700 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase active:scale-95"><i class="fas fa-sync-alt mr-1"></i> Refresh Now</button></div>
+    <div class="w-full card-modern border-l-4 border-green-500">
+        <h3 class="text-xs font-bold text-green-500 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-file-excel"></i> Export</h3>
+        <div class="grid grid-cols-1 gap-3">
+            <button onclick="exportExcel()" class="btn-primary py-3 text-sm bg-gradient-to-r from-green-600 to-emerald-600"><i class="fas fa-file-excel"></i> Full Excel Workbook</button>
+            <button onclick="exportCSV()" class="btn-secondary py-3 text-xs">Quick CSV (Gigs only)</button>
+            <button onclick="exportPDF()" class="btn-secondary py-3 text-xs bg-red-600 hover:bg-red-500">Backup PDF Summary</button>
+        </div>
+    </div>
+    <div class="w-full card-modern border-l-4 border-purple-500">
+        <h3 class="text-xs font-bold text-purple-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-database"></i> Backup &amp; Import</h3>
+        <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Export a JSON backup of all data, or import data from another device.</p>
+        <div class="grid grid-cols-1 gap-2 mb-4">
+            <button onclick="exportJSON()" class="btn-secondary py-3 text-xs"><i class="fas fa-download mr-1"></i> Download JSON Backup</button>
+        </div>
+        <details class="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+            <summary class="text-xs font-bold text-purple-300 cursor-pointer uppercase tracking-wider">Import from another device</summary>
+            <div class="mt-3 space-y-3">
+                <p class="text-[10px] text-slate-400 leading-relaxed">Paste JSON below. Works for both v11 (old format — will be migrated) and v12 backups. <strong class="text-amber-400">This will REPLACE all current data.</strong></p>
+                <textarea id="import_json" placeholder='Paste JSON here (starts with {"shows":...} or {"settings":...})' class="input-modern text-[10px] font-mono h-32" style="font-family:monospace;"></textarea>
+                <button onclick="importJSON()" class="btn-fun py-3 text-sm w-full"><i class="fas fa-upload mr-1"></i> Import &amp; Replace All Data</button>
+            </div>
+        </details>
+    </div>
+    <div class="w-full card-modern border-l-4 border-orange-500">
+        <h3 class="text-xs font-bold text-orange-400 uppercase tracking-widest mb-3 flex items-center gap-2"><i class="fas fa-calendar-check"></i> Year-End Reset</h3>
+        <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Archive all current sales data and reset for a new year. Backups required before reset.</p>
+        <button onclick="openYearEndResetFlow()" class="btn-secondary py-3 text-xs bg-orange-700 hover:bg-orange-600 border-orange-600"><i class="fas fa-calendar-times mr-1"></i> Start Year-End Reset</button>
+    </div>
+    <div class="pt-10 pb-10"><button onclick="if(confirm('Wipe all data? This cannot be undone.')){localStorage.removeItem(DB_KEY);location.reload();}" class="text-red-500/50 text-xs w-full text-center hover:text-red-500 hover:underline font-bold uppercase tracking-widest">Reset App Data</button></div>
+    </div>`;
+};
+
+// =============== MISC HANDLERS ===============
 window.toggleTourCollapse=(n)=>{state.ui.collapsedTours[n]=!state.ui.collapsedTours[n];saveData();window.renderDashboard();};
 window.router=(v)=>{document.querySelectorAll('.view-section').forEach(e=>e.classList.remove('active'));document.getElementById(`view-${v}`).classList.add('active');document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('nav-active'));const a=document.getElementById(`nav-${v}`);if(a)a.classList.add('nav-active');if(v==='dashboard')window.renderDashboard();if(v==='vendor')window.renderVendor();if(v==='tour-stock')window.renderTourStock();if(v==='inventory')window.renderInventory();if(v==='label')window.renderLabel();if(v==='settings')window.renderSettings();if(v==='add-show')window.renderAddShow();window.scrollTo(0,0);};
+
 const fireConfetti=()=>{const canvas=document.getElementById('confetti-canvas'),ctx=canvas.getContext('2d');canvas.width=window.innerWidth;canvas.height=window.innerHeight;const p=[];for(let i=0;i<100;i++)p.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height-canvas.height,vx:Math.random()*4-2,vy:Math.random()*5+5,color:`hsl(${Math.random()*360},70%,50%)`,size:Math.random()*8+4});const a=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);let act=false;p.forEach(p=>{p.x+=p.vx;p.y+=p.vy;ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.size,p.size);if(p.y<canvas.height)act=true;});if(act)requestAnimationFrame(a);else ctx.clearRect(0,0,canvas.width,canvas.height);};a();};
-window.submitShow=(e)=>{e.preventDefault();const f=e.target;let tn=f.tourSelect.value;if(tn==='NEW')tn=f.newTour.value.trim();if(!tn)tn="Individual Gig";const sd={id:editingShowId||Date.now(),tour:tn,city:f.city.value,venue:f.venue.value,date:f.date.value,currency:f.currency.value||'EUR',venuePercent:parseFloat(f.venuePercent.value)||0,sales:{},freebies:{},paymentMethods:{cash:parseFloat(f.pay_cash.value)||0,card:parseFloat(f.pay_card.value)||0,paypal:parseFloat(f.pay_paypal.value)||0}};ITEMS.forEach(i=>{const q=parseInt(f[`qty_${i.id}`].value)||0,p=parseFloat(f[`price_${i.id}`].value)||0;if(q>0)sd.sales[i.id]={qty:q,price:p};if(p>0&&!editingShowId)state.settings.lastPrices[i.id]=p;const fr=parseInt(f[`free_${i.id}`].value)||0;if(fr>0)sd.freebies[i.id]=fr;});if(editingShowId){state.shows[state.shows.findIndex(s=>s.id===editingShowId)]=sd;editingShowId=null;}else{state.shows.push(sd);setUndo('add_show',sd);fireConfetti();}pendingVendorData=null;saveData();f.reset();window.router('dashboard');showToast("Saved!","fa-thumbs-up");};
+
+window.submitShow=(e)=>{
+    e.preventDefault();
+    const f=e.target;
+    let tn=f.tourSelect.value;
+    if(tn==='NEW')tn=f.newTour.value.trim();
+    if(!tn)tn="Individual Gig";
+    const cutType = f.venueCutType.value || 'percent';
+    const sd={
+        id:editingShowId||Date.now(),
+        tour:tn,
+        city:f.city.value,
+        venue:f.venue.value,
+        date:f.date.value,
+        currency:f.currency.value||'EUR',
+        venueCutType: cutType,
+        venuePercent: cutType==='percent' ? (parseFloat(f.venuePercent.value)||0) : 0,
+        venueCutAmount: cutType==='amount' ? (parseFloat(f.venueCutAmount.value)||0) : 0,
+        sales:{},freebies:{},
+        paymentMethods:{
+            cash:parseFloat(f.pay_cash.value)||0,
+            card:parseFloat(f.pay_card.value)||0,
+            paypal:parseFloat(f.pay_paypal.value)||0
+        }
+    };
+    ALL_SELLABLE.forEach(i=>{
+        const q=parseInt(f[`qty_${i.id}`].value)||0;
+        const p=parseFloat(f[`price_${i.id}`].value)||0;
+        if(q>0)sd.sales[i.id]={qty:q,price:p};
+        if(p>0&&!editingShowId)state.settings.lastPrices[i.id]=p;
+        const fr=parseInt(f[`free_${i.id}`].value)||0;
+        if(fr>0)sd.freebies[i.id]=fr;
+    });
+    if(editingShowId){
+        state.shows[state.shows.findIndex(s=>s.id===editingShowId)]=sd;
+        editingShowId=null;
+    } else {
+        state.shows.push(sd);
+        setUndo('add_show',sd);
+        fireConfetti();
+    }
+    pendingVendorData=null;
+    saveData();
+    f.reset();
+    window.router('dashboard');
+    showToast("Saved!","fa-thumbs-up");
+};
+
 window.handleTourSel=(sel)=>{const inp=document.getElementById('newTourInput'),ban=document.getElementById('tourBanner'),disp=document.getElementById('tourDisp'),card=document.getElementById('logDetailsCard');if(sel.value==='NEW'){inp.classList.remove('hidden');inp.focus();ban.classList.add('hidden');card.className="card-modern";}else if(sel.value){inp.classList.add('hidden');ban.classList.remove('hidden');disp.innerText=sel.value;card.className="card-modern border-2 border-indigo-500 bg-gradient-to-br from-slate-800 to-indigo-900/30";}else{inp.classList.add('hidden');ban.classList.add('hidden');card.className="card-modern";}};
-window.openGigModal=(id)=>{const s=state.shows.find(s=>s.id===id);const sym=getSym(s.currency);const net=calcNet(s);document.getElementById('modalTitle').innerText=s.city;let sh=Object.keys(s.sales).length?Object.entries(s.sales).map(([k,v])=>`<div class="flex justify-between text-sm text-slate-300"><span>${getItem(k).label} (x${v.qty})</span><span>${sym}${v.price} ${s.currency}</span></div>`).join(''):'<p class="text-slate-500 text-sm italic">No Sales</p>';document.getElementById('modalBody').innerHTML=`<div class="space-y-3"><div class="flex justify-between text-xs font-bold text-slate-500 uppercase border-b border-slate-700 pb-2"><span>${s.date}</span><span>${s.tour}</span></div><div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700">${sh}</div><div class="flex justify-between items-center mt-2"><span class="text-xs text-slate-400 font-bold uppercase">${s.venue}</span><span class="text-sm font-extrabold text-emerald-400">Net: ${sym}${Math.round(net).toLocaleString()} ${s.currency}</span></div></div>`;document.getElementById('modalFooter').innerHTML=`<div class="flex gap-3 w-full"><button onclick="closeModal();editShow(${id})" class="btn-primary py-2 text-sm flex-1">Edit</button><button onclick="closeModal()" class="btn-secondary py-2 text-sm bg-transparent border-slate-600 flex-1">Close</button></div><button onclick="deleteShow(${id})" class="btn-danger w-full"><i class="fas fa-trash-alt mr-2"></i> Delete This Gig</button>`;document.getElementById('modalOverlay').classList.remove('hidden');setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);};
+
+window.openGigModal=(id)=>{
+    const s=state.shows.find(s=>s.id===id);
+    const sym=getSym(s.currency);
+    const net=calcNet(s);
+    const gross=calcGross(s);
+    const vc = calcVenueCut(s);
+    document.getElementById('modalTitle').innerText=s.city;
+    let sh=Object.keys(s.sales).length?Object.entries(s.sales).map(([k,v])=>{const item=getSellable(k);const isB = isBundle(k);return `<div class="flex justify-between text-sm ${isB?'text-amber-300':'text-slate-300'}"><span>${item.label||k}${isB?' 📦':''} (x${v.qty})</span><span>${sym}${v.price} ${s.currency}</span></div>`;}).join(''):'<p class="text-slate-500 text-sm italic">No Sales</p>';
+    const cutLabel = s.venueCutType==='amount' ? `${sym}${s.venueCutAmount} flat` : `${s.venuePercent||0}%`;
+    document.getElementById('modalBody').innerHTML=`<div class="space-y-3"><div class="flex justify-between text-xs font-bold text-slate-500 uppercase border-b border-slate-700 pb-2"><span>${s.date}</span><span>${s.tour}</span></div><div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700">${sh}</div><div class="bg-slate-900/30 p-2 rounded text-xs space-y-1"><div class="flex justify-between text-slate-400"><span>Gross</span><span>${sym}${gross}</span></div><div class="flex justify-between text-red-400"><span>Venue cut (${cutLabel})</span><span>-${sym}${vc.toFixed(0)}</span></div><div class="flex justify-between font-extrabold text-emerald-400 pt-1 border-t border-slate-700"><span>Net</span><span>${sym}${Math.round(net)} ${s.currency}</span></div></div><div class="flex justify-between items-center mt-2"><span class="text-xs text-slate-400 font-bold uppercase">${s.venue}</span></div></div>`;
+    document.getElementById('modalFooter').innerHTML=`<div class="flex gap-3 w-full"><button onclick="closeModal();editShow(${id})" class="btn-primary py-2 text-sm flex-1">Edit</button><button onclick="closeModal()" class="btn-secondary py-2 text-sm bg-transparent border-slate-600 flex-1">Close</button></div><button onclick="deleteShow(${id})" class="btn-danger w-full"><i class="fas fa-trash-alt mr-2"></i> Delete This Gig</button>`;
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);
+};
+
 window.deleteShow=(id)=>{if(!confirm("Delete this gig? Cannot be undone."))return;state.shows=state.shows.filter(s=>s.id!==id);saveData();closeModal();window.renderDashboard();showToast("Gig deleted","fa-trash-alt");};
 window.editShow=(id)=>{editingShowId=id;window.router('add-show');};
 window.toggleTransferForm=(t)=>{document.getElementById('transferFormContainer').classList.remove('hidden');document.getElementById('transferType').value=t;document.getElementById('transferTitle').innerText=t==='TO_TOUR'?"Load Bus":"Unload Bus";};
 window.submitTransfer=(e)=>{e.preventDefault();const f=e.target,t=f.transferType.value,items={};ITEMS.forEach(i=>{const q=parseInt(f[`t_qty_${i.id}`].value)||0;if(q>0)items[i.id]=q;});if(!Object.keys(items).length)return alert("Enter qty");if(t==='TO_TOUR'){const c=getTourCap();let nv=c.vinyl,nc=c.cd;ITEMS.forEach(i=>{const q=items[i.id]||0;if(i.type==='vinyl')nv+=q;else if(i.type==='cd')nc+=q;});const w=[];if(nv>SUITCASE_LIMITS.vinyl)w.push(`Vinyl: ${nv}/${SUITCASE_LIMITS.vinyl}`);if(nc>SUITCASE_LIMITS.cd)w.push(`CD: ${nc}/${SUITCASE_LIMITS.cd}`);if(w.length&&!confirm(`⚠️ OVER CAPACITY!\n${w.join('\n')}\nProceed?`))return;}const d={id:Date.now(),date:f.transferDate.value,type:t,items};state.transfers.push(d);setUndo('transfer',d);saveData();document.getElementById('transferFormContainer').classList.add('hidden');f.reset();window.renderTourStock();showToast(t==='TO_TOUR'?"Bus Loaded! 👍":"Unloaded","fa-check");};
 window.updateInitialStock=(id,v)=>{state.inventory[id]=parseInt(v)||0;saveData();document.getElementById(`homeVal_${id}`).innerText=getStockLevels(id).home;};
 window.toggleMasterStock=(c)=>{state.ui.masterStockCollapsed=c;saveData();window.renderInventory();};
-window.updateSetting=(k,v)=>{state.settings[k]=k==='designerPercent'?parseFloat(v):v;saveData();showToast('Updated');};
+window.updateSetting=(k,v)=>{state.settings[k]=v;saveData();showToast('Updated');};
 window.updateOverviewTour=(v)=>{state.ui.selectedOverviewTour=v;window.renderDashboard();saveData();};
 window.updateCurLabels=(v)=>{const s=getSym(v);document.querySelectorAll('.currency-label').forEach(e=>e.innerText=s);};
-window.exportCSV=()=>{const h=["Date","Tour","City","Venue","Currency","Gross","Net"];let csv="data:text/csv;charset=utf-8,"+h.join(",")+"\r\n";state.shows.forEach(s=>{let g=0;ITEMS.forEach(i=>{const x=s.sales?.[i.id];if(x&&x.qty>0)g+=(x.qty*x.price);});csv+=[s.date,`"${s.tour}"`,`"${s.city}"`,`"${s.venue}"`,s.currency,g.toFixed(2),calcNet(s).toFixed(2)].join(",")+"\r\n";});const l=document.createElement("a");l.setAttribute("href",encodeURI(csv));l.setAttribute("download","merch.csv");document.body.appendChild(l);l.click();document.body.removeChild(l);};
-window.exportPDF=()=>{const{jsPDF}=window.jspdf;const d=new jsPDF();d.setFontSize(18);d.text("Shai Maestro Merch Backup",10,10);d.setFontSize(10);let y=20;d.text(`Total Shows: ${state.shows.length}`,10,y+=10);d.text(`Stock:`,10,y+=10);ITEMS.forEach(i=>{d.text(`- ${i.label}: ${state.inventory[i.id]}`,15,y+=6);});d.save("merch_backup.pdf");};
+window.refreshRates=async (btn)=>{
+    const orig = btn.innerHTML;
+    btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i> Fetching...';
+    btn.disabled = true;
+    const before = ratesUpdatedAt ? ratesUpdatedAt.getTime() : 0;
+    await fetchExchangeRates();
+    btn.disabled = false;
+    if (ratesUpdatedAt && ratesUpdatedAt.getTime() > before) {
+        showToast('Rates updated','fa-coins');
+        window.renderSettings();
+    } else {
+        btn.innerHTML = orig;
+        showToast('Could not fetch rates — check connection','fa-exclamation-triangle');
+    }
+};
+
+window.exportJSON = () => {
+    const payload = {
+        _meta: {
+            exportedAt: new Date().toISOString(),
+            version: 12,
+            app: 'shai_maestro_merch'
+        },
+        ...state
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shai_merch_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded','fa-download');
+    // Mark in year-end flow if active
+    if (window._yearEndState) { window._yearEndState.jsonBackedUp = true; window.renderYearEndModal(); }
+};
+
+// =============== YEAR-END RESET ===============
+window.openYearEndResetFlow = (autoPrompt) => {
+    const currentYear = new Date().getFullYear();
+    const yearsInData = [...new Set(state.shows.map(s => (s.date||'').substring(0,4)).filter(Boolean))].sort();
+    const oldestYear = yearsInData[0] || currentYear;
+    const newestYear = yearsInData[yearsInData.length-1] || currentYear;
+
+    window._yearEndState = {
+        excelBackedUp: false,
+        jsonBackedUp: false,
+        autoPrompt: !!autoPrompt,
+        showCount: state.shows.length,
+        shipmentCount: state.shipments.length,
+        oldestYear,
+        newestYear
+    };
+    window.renderYearEndModal();
+};
+
+window.renderYearEndModal = () => {
+    const s = window._yearEndState;
+    if (!s) return;
+    const ready = s.excelBackedUp && s.jsonBackedUp;
+    const headline = s.autoPrompt
+        ? `It's a new year! Reset for ${new Date().getFullYear()}?`
+        : `Reset all sales for a new year?`;
+
+    document.getElementById('modalTitle').innerText = '🗓️ Year-End Reset';
+    document.getElementById('modalBody').innerHTML = `
+        <div class="space-y-4">
+            <p class="text-sm text-slate-200 font-bold leading-relaxed">${headline}</p>
+            <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-700 text-xs space-y-1">
+                <div class="text-slate-400 uppercase font-bold text-[10px] mb-2">Current Data</div>
+                <div class="flex justify-between"><span class="text-slate-300">Shows logged:</span><span class="text-white font-bold">${s.showCount}</span></div>
+                <div class="flex justify-between"><span class="text-slate-300">Shipments logged:</span><span class="text-white font-bold">${s.shipmentCount}</span></div>
+                <div class="flex justify-between"><span class="text-slate-300">Year range:</span><span class="text-white font-bold">${s.oldestYear} – ${s.newestYear}</span></div>
+            </div>
+            <div class="bg-amber-500/10 border border-amber-500/30 p-3 rounded-lg">
+                <p class="text-[11px] text-amber-300 font-bold mb-2 uppercase">⚠️ Step 1: Back up first</p>
+                <p class="text-[10px] text-amber-200/80 leading-relaxed">Both backups required before reset. The reset is permanent.</p>
+            </div>
+            <div class="space-y-2">
+                <button onclick="exportExcel()" class="w-full ${s.excelBackedUp?'bg-green-700':'bg-emerald-600'} text-white font-bold py-3 rounded-xl text-sm flex justify-between px-4 items-center active:scale-95">
+                    <span><i class="fas ${s.excelBackedUp?'fa-check-circle':'fa-file-excel'} mr-2"></i>${s.excelBackedUp?'Excel Downloaded':'Download Excel Workbook'}</span>
+                    ${s.excelBackedUp?'<i class="fas fa-check text-green-300"></i>':'<i class="fas fa-arrow-right"></i>'}
+                </button>
+                <button onclick="exportJSON()" class="w-full ${s.jsonBackedUp?'bg-green-700':'bg-purple-600'} text-white font-bold py-3 rounded-xl text-sm flex justify-between px-4 items-center active:scale-95">
+                    <span><i class="fas ${s.jsonBackedUp?'fa-check-circle':'fa-download'} mr-2"></i>${s.jsonBackedUp?'JSON Downloaded':'Download JSON Backup'}</span>
+                    ${s.jsonBackedUp?'<i class="fas fa-check text-green-300"></i>':'<i class="fas fa-arrow-right"></i>'}
+                </button>
+            </div>
+            ${ready?`
+                <div class="bg-red-500/10 border border-red-500/40 p-3 rounded-lg mt-4">
+                    <p class="text-[11px] text-red-300 font-bold mb-1 uppercase">⚠️ Step 2: Confirm reset</p>
+                    <p class="text-[10px] text-red-200/80 leading-relaxed">This will delete all shows, shipments, transfers, and freebies. Inventory levels will be preserved (you'll keep your current home/tour stock numbers as starting point).</p>
+                </div>
+            `:`
+                <p class="text-[10px] text-slate-500 text-center italic mt-2">Both backups required to proceed</p>
+            `}
+        </div>
+    `;
+    document.getElementById('modalFooter').innerHTML = `
+        <button onclick="confirmYearEndReset()" ${ready?'':'disabled'} class="w-full ${ready?'bg-red-600 hover:bg-red-500':'bg-slate-700 cursor-not-allowed'} text-white font-extrabold py-4 rounded-2xl text-sm uppercase active:scale-95 flex items-center justify-center gap-2">
+            <i class="fas fa-trash-alt"></i> ${ready?'Reset All Sales Data Now':'Backups Required'}
+        </button>
+        <button onclick="closeYearEndModal()" class="w-full py-2 text-slate-400 font-bold text-xs uppercase">Cancel</button>
+    `;
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);
+};
+
+window.closeYearEndModal = () => {
+    window._yearEndState = null;
+    closeModal();
+};
+
+window.confirmYearEndReset = () => {
+    if (!window._yearEndState || !window._yearEndState.excelBackedUp || !window._yearEndState.jsonBackedUp) return;
+    if (!confirm('FINAL CONFIRMATION:\n\nDelete all shows, shipments, transfers, and freebies?\n\nInventory will be preserved.\n\nThis cannot be undone.')) return;
+
+    // Preserve inventory (current physical home stock - what's in the warehouse right now)
+    // Recalculate "true" home stock by taking current home levels (with all the historical math) and locking those in as new starting inventory
+    const newInventory = {};
+    ITEMS.forEach(i => {
+        const l = getStockLevels(i.id);
+        // Preserve home stock as new initial. Tour stock gets reset to zero (you should unload bus first anyway).
+        newInventory[i.id] = Math.max(0, l.home);
+    });
+
+    // Wipe transactional data
+    state.shows = [];
+    state.shipments = [];
+    state.transfers = [];
+    state.inventory = newInventory;
+    state.ui.collapsedTours = {};
+    state.ui.selectedOverviewTour = 'CURRENT';
+    state.settings.lastYearEndReset = new Date().getFullYear();
+
+    saveData();
+    window._yearEndState = null;
+    closeModal();
+    showToast(`Reset complete. Welcome to ${new Date().getFullYear()}!`, 'fa-calendar-check');
+    fireConfetti();
+    setTimeout(() => location.reload(), 1200);
+};
+
+// Auto-prompt: if it's Jan 1st or later AND we have data from last year AND we haven't already reset this year
+const checkYearEndAutoPrompt = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const lastReset = state.settings.lastYearEndReset || 0;
+    if (lastReset >= currentYear) return; // already reset this year
+    // Only prompt on/after Jan 1st of the current year
+    // Check if we have shows from the previous year
+    const hasLastYearData = state.shows.some(s => {
+        const y = parseInt((s.date||'').substring(0,4));
+        return y && y < currentYear;
+    });
+    if (hasLastYearData && state.shows.length > 0) {
+        // Delay slightly so the dashboard renders first
+        setTimeout(() => window.openYearEndResetFlow(true), 1500);
+    }
+};
+
+// Detect if a parsed JSON object looks like v11 (has the removed items somewhere)
+const looksLikeV11 = (obj) => {
+    if (!obj) return false;
+    // v11 had postcards/tote/mini_cd in inventory or sales
+    if (obj.inventory && (obj.inventory.postcards !== undefined || obj.inventory.tote !== undefined || obj.inventory.mini_cd !== undefined)) return true;
+    if (obj.settings && obj.settings.designerPercent !== undefined) return true;
+    if (obj.shows && obj.shows.some(s => s.sales && (s.sales.postcards || s.sales.tote || s.sales.mini_cd))) return true;
+    return false;
+};
+
+window.importJSON = () => {
+    const raw = document.getElementById('import_json').value.trim();
+    if (!raw) return alert('Paste JSON first.');
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch(e) {
+        return alert('Invalid JSON: ' + e.message);
+    }
+
+    // Strip _meta if present (from v12 export)
+    if (parsed._meta) delete parsed._meta;
+
+    // Sanity check - must look like our data shape
+    if (!parsed.shows && !parsed.shipments && !parsed.inventory) {
+        return alert('This JSON does not look like merch app data. Expected fields like "shows", "shipments", "inventory" not found.');
+    }
+
+    const isV11 = looksLikeV11(parsed);
+    const summary = `Found:\n• ${(parsed.shows||[]).length} shows\n• ${(parsed.shipments||[]).length} shipments\n• ${(parsed.transfers||[]).length} transfers\n\nFormat: ${isV11 ? 'v11 (will be migrated to v12)' : 'v12'}\n\n⚠️ This will REPLACE all your current data.\nProceed?`;
+    if (!confirm(summary)) return;
+
+    let dataToLoad;
+    if (isV11) {
+        const {data, log} = migrateFromV11(parsed);
+        dataToLoad = data;
+        setTimeout(() => {
+            alert(`Migration done:\n\n• ${log.gigsTouched} gig(s) updated\n• ${log.postcardSales} postcard sales → Vinyl+Poster bundles\n• ${log.toteSales} tote sales → CD+Poster bundles\n• ${log.miniCdSales} mini-CD sales removed\n\nDesigner cut removed.`);
+        }, 100);
+    } else {
+        dataToLoad = parsed;
+    }
+
+    // Replace state
+    state = {
+        shows: dataToLoad.shows || [],
+        shipments: dataToLoad.shipments || [],
+        transfers: dataToLoad.transfers || [],
+        inventory: dataToLoad.inventory || {},
+        settings: dataToLoad.settings || {email:'', lastPrices:{}, dataVersion:12, migrationDone:true},
+        ui: dataToLoad.ui || {masterStockCollapsed:true, selectedOverviewTour:'CURRENT', collapsedTours:{}},
+        vendorSession: {active:false, stock:{}, prices:{}, sales:[], meta:{}}
+    };
+
+    // Ensure all current items have inventory keys
+    ITEMS.forEach(item => {
+        if (state.inventory[item.id] === undefined) state.inventory[item.id] = 0;
+    });
+
+    saveData();
+    showToast('Import complete!', 'fa-check-circle');
+    setTimeout(() => location.reload(), 800);
+};
+
+// =============== EXPORTS ===============
+window.exportCSV=()=>{
+    const h=["Date","Tour","City","Venue","Currency","Gross","Venue Cut","Net","Net EUR"];
+    let csv="data:text/csv;charset=utf-8,"+h.join(",")+"\r\n";
+    state.shows.forEach(s=>{
+        const g=calcGross(s);
+        const vc=calcVenueCut(s);
+        const n=calcNet(s);
+        const nE=toEUR(n,s.currency);
+        csv+=[s.date,`"${s.tour}"`,`"${s.city}"`,`"${s.venue}"`,s.currency,g.toFixed(2),vc.toFixed(2),n.toFixed(2),nE.toFixed(2)].join(",")+"\r\n";
+    });
+    const l=document.createElement("a");l.setAttribute("href",encodeURI(csv));l.setAttribute("download","merch.csv");document.body.appendChild(l);l.click();document.body.removeChild(l);
+};
+
+window.exportExcel=()=>{
+    if (typeof XLSX === 'undefined') return alert('XLSX library not loaded');
+    const wb = XLSX.utils.book_new();
+    const exportDate = new Date().toISOString().split('T')[0];
+
+    // Helper: apply column widths
+    const setColWidths = (ws, widths) => { ws['!cols'] = widths.map(w => ({wch: w})); };
+    // Helper: apply autofilter to a range
+    const setAutoFilter = (ws, range) => { ws['!autofilter'] = {ref: range}; };
+    // Helper: freeze top row
+    const freezeTopRow = (ws) => { ws['!freeze'] = {xSplit: 0, ySplit: 1}; ws['!views'] = [{state: 'frozen', ySplit: 1, xSplit: 0}]; };
+
+    // ========== SHEET 1: SUMMARY ==========
+    let totalNetEur = 0, totalGrossEur = 0, totalVenueCutEur = 0, totalShipping = 0;
+    const byCurrency = {};
+    const byPayment = {cash:0, card:0, paypal:0};
+    state.shows.forEach(s => {
+        const g = calcGross(s), vc = calcVenueCut(s), n = calcNet(s);
+        totalGrossEur += toEUR(g, s.currency);
+        totalVenueCutEur += toEUR(vc, s.currency);
+        totalNetEur += toEUR(n, s.currency);
+        byCurrency[s.currency] = byCurrency[s.currency] || {gross:0, net:0, count:0};
+        byCurrency[s.currency].gross += g;
+        byCurrency[s.currency].net += n;
+        byCurrency[s.currency].count++;
+        const pm = s.paymentMethods||{cash:n,card:0,paypal:0};
+        const ct = (pm.cash+pm.card+pm.paypal)||n;
+        const sc = ct>0?(n/ct):0;
+        const rate = s.currency==='EUR'?1:(eurRates[s.currency]?(1/eurRates[s.currency]):1);
+        byPayment.cash += pm.cash*sc*rate;
+        byPayment.card += pm.card*sc*rate;
+        byPayment.paypal += pm.paypal*sc*rate;
+    });
+    state.shipments.forEach(s => {let c=parseFloat(s.shipping)||0;s.items.forEach(i=>c+=(i.qty*i.cost));totalShipping+=c;});
+
+    const summaryData = [
+        ['SHAI MAESTRO MERCH SALES — FULL EXPORT'],
+        [`Generated: ${exportDate}`],
+        [],
+        ['HEADLINE NUMBERS (EUR)'],
+        ['Total Gross', Math.round(totalGrossEur)],
+        ['Total Venue Cuts', -Math.round(totalVenueCutEur)],
+        ['Total Net (gigs)', Math.round(totalNetEur)],
+        ['Total Shipping Costs', -Math.round(totalShipping)],
+        ['NET AFTER SHIPPING', Math.round(totalNetEur - totalShipping)],
+        [],
+        ['BY CURRENCY (native amounts)'],
+        ['Currency', 'Gigs', 'Gross', 'Net'],
+        ...Object.entries(byCurrency).map(([cur, d]) => [cur, d.count, Math.round(d.gross), Math.round(d.net)]),
+        [],
+        ['PAYMENT METHOD SPLIT (EUR, est.)'],
+        ['Cash', Math.round(byPayment.cash)],
+        ['Card', Math.round(byPayment.card)],
+        ['PayPal', Math.round(byPayment.paypal)],
+        [],
+        ['INVENTORY SNAPSHOT'],
+        ['Item', 'Home', 'Tour', 'Total'],
+        ...ITEMS.map(i => {const l=getStockLevels(i.id);return [i.label, l.home, l.tour, l.home+l.tour];}),
+        [],
+        ['EXCHANGE RATES (per EUR, used at export)'],
+        ['Rates updated', ratesUpdatedAt ? ratesUpdatedAt.toISOString() : 'fallback'],
+        ...Object.entries(eurRates).slice(0,15).map(([c,r])=>[c, r])
+    ];
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    setColWidths(wsSummary, [30, 18, 15, 15]);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+    // ========== SHEET 2: GIGS ==========
+    const gigHeaders = ['Date','Tour','City','Venue','Currency','Gross','Venue Cut Type','Venue Cut Amount','Venue Cut %','Venue Cut Calc','Net','Net (EUR)','Cash','Card','PayPal','Items Sold (count)','Bundles Sold (count)'];
+    const gigRows = state.shows.map(s => {
+        const g = calcGross(s), vc = calcVenueCut(s), n = calcNet(s);
+        let itemQty = 0, bundleQty = 0;
+        Object.entries(s.sales||{}).forEach(([k,v]) => {
+            if (isBundle(k)) bundleQty += v.qty;
+            else itemQty += v.qty;
+        });
+        const pm = s.paymentMethods||{cash:0,card:0,paypal:0};
+        return [
+            s.date, s.tour, s.city, s.venue, s.currency,
+            +g.toFixed(2),
+            s.venueCutType||'percent',
+            s.venueCutAmount||0,
+            s.venuePercent||0,
+            +vc.toFixed(2),
+            +n.toFixed(2),
+            +toEUR(n, s.currency).toFixed(2),
+            pm.cash, pm.card, pm.paypal,
+            itemQty, bundleQty
+        ];
+    });
+    // Sort by date
+    gigRows.sort((a,b) => (a[0]||'').localeCompare(b[0]||''));
+    // Totals row
+    const totals = ['TOTAL','','','','',
+        gigRows.reduce((s,r)=>s+(r[5]||0),0).toFixed(2),
+        '','','',
+        gigRows.reduce((s,r)=>s+(r[9]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[10]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[11]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[12]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[13]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[14]||0),0).toFixed(2),
+        gigRows.reduce((s,r)=>s+(r[15]||0),0),
+        gigRows.reduce((s,r)=>s+(r[16]||0),0)
+    ];
+    const wsGigs = XLSX.utils.aoa_to_sheet([gigHeaders, ...gigRows, [], totals]);
+    setColWidths(wsGigs, [12, 22, 18, 28, 8, 10, 14, 14, 12, 14, 12, 12, 10, 10, 10, 14, 16]);
+    if (gigRows.length > 0) setAutoFilter(wsGigs, `A1:Q${gigRows.length+1}`);
+    freezeTopRow(wsGigs);
+    XLSX.utils.book_append_sheet(wb, wsGigs, 'Gigs');
+
+    // ========== SHEET 3: SALES BY ITEM ==========
+    const salesHeaders = ['Date','Tour','City','Venue','Currency','Item ID','Item Label','Type','Qty','Unit Price','Line Total','Line Total (EUR)'];
+    const salesRows = [];
+    state.shows.forEach(s => {
+        Object.entries(s.sales||{}).forEach(([k,v]) => {
+            const item = getSellable(k);
+            const lineTotal = v.qty * v.price;
+            salesRows.push([
+                s.date, s.tour, s.city, s.venue, s.currency,
+                k, item.label || k,
+                isBundle(k) ? 'Bundle' : 'Item',
+                v.qty, v.price,
+                +lineTotal.toFixed(2),
+                +toEUR(lineTotal, s.currency).toFixed(2)
+            ]);
+        });
+    });
+    salesRows.sort((a,b) => (a[0]||'').localeCompare(b[0]||''));
+    const wsSales = XLSX.utils.aoa_to_sheet([salesHeaders, ...salesRows]);
+    setColWidths(wsSales, [12, 22, 18, 28, 8, 22, 22, 8, 6, 10, 12, 14]);
+    if (salesRows.length > 0) setAutoFilter(wsSales, `A1:L${salesRows.length+1}`);
+    freezeTopRow(wsSales);
+    XLSX.utils.book_append_sheet(wb, wsSales, 'Sales by Item');
+
+    // ========== SHEET 4: SHIPMENTS ==========
+    const shipHeaders = ['Date','Invoice','Ship To City','Ship To Country','# Line Items','Items Cost (€)','Shipping (€)','Total (€)','Paid','Paid Date','Items Detail'];
+    const shipRows = state.shipments.map(sh => {
+        let itemsCost = 0;
+        sh.items.forEach(i => itemsCost += (i.qty * i.cost));
+        const shipping = parseFloat(sh.shipping)||0;
+        const detail = sh.items.map(i => `${getItem(i.itemId).label||i.itemId} x${i.qty} @€${i.cost}`).join('; ');
+        return [
+            sh.date, sh.invoice||'', sh.shipCity||'', sh.shipCountry||'',
+            sh.items.length, +itemsCost.toFixed(2), +shipping.toFixed(2), +(itemsCost+shipping).toFixed(2),
+            sh.paid?'Yes':'No', sh.paidDate||'', detail
+        ];
+    });
+    shipRows.sort((a,b) => (a[0]||'').localeCompare(b[0]||''));
+    const shipTotals = ['TOTAL','','','','',
+        shipRows.reduce((s,r)=>s+(r[5]||0),0).toFixed(2),
+        shipRows.reduce((s,r)=>s+(r[6]||0),0).toFixed(2),
+        shipRows.reduce((s,r)=>s+(r[7]||0),0).toFixed(2),
+        '','',''
+    ];
+    const wsShip = XLSX.utils.aoa_to_sheet([shipHeaders, ...shipRows, [], shipTotals]);
+    setColWidths(wsShip, [12, 14, 18, 14, 12, 14, 12, 12, 8, 12, 60]);
+    if (shipRows.length > 0) setAutoFilter(wsShip, `A1:K${shipRows.length+1}`);
+    freezeTopRow(wsShip);
+    XLSX.utils.book_append_sheet(wb, wsShip, 'Shipments');
+
+    // ========== SHEET 5: INVENTORY ==========
+    const invHeaders = ['Item ID','Item Label','Type','Initial (Master)','Shipments In','Net Transfers (to tour - from tour)','Sold + Free (incl. bundles)','Home','Tour','Total','Low Threshold','Below Threshold?'];
+    const invRows = ITEMS.map(i => {
+        const l = getStockLevels(i.id);
+        // breakdown
+        let shipIn = 0;
+        state.shipments.forEach(sh => sh.items.forEach(it => {if(it.itemId===i.id) shipIn += it.qty;}));
+        let netTrans = 0;
+        state.transfers.forEach(t => {
+            const q = t.items[i.id]||0;
+            if (t.type==='TO_TOUR') netTrans += q;
+            else netTrans -= q;
+        });
+        let soldFree = 0;
+        state.shows.forEach(s => {
+            if (s.sales?.[i.id]) soldFree += s.sales[i.id].qty;
+            if (s.freebies?.[i.id]) soldFree += s.freebies[i.id];
+            BUNDLES.forEach(b => {
+                if (b.components.includes(i.id)) {
+                    if (s.sales?.[b.id]) soldFree += s.sales[b.id].qty;
+                    if (s.freebies?.[b.id]) soldFree += s.freebies[b.id];
+                }
+            });
+        });
+        return [i.id, i.label, i.type, state.inventory[i.id]||0, shipIn, netTrans, soldFree, l.home, l.tour, l.home+l.tour, i.lowThreshold, l.home<i.lowThreshold?'YES':'No'];
+    });
+    const wsInv = XLSX.utils.aoa_to_sheet([invHeaders, ...invRows]);
+    setColWidths(wsInv, [16, 22, 8, 14, 14, 14, 14, 8, 8, 8, 14, 18]);
+    freezeTopRow(wsInv);
+    XLSX.utils.book_append_sheet(wb, wsInv, 'Inventory');
+
+    // ========== SHEET 6: TOURS ==========
+    const tourHeaders = ['Tour','# Gigs','First Date','Last Date','Gross (EUR)','Venue Cuts (EUR)','Net (EUR)','Avg Net/Gig (EUR)','Currencies'];
+    const tourMap = {};
+    state.shows.forEach(s => {
+        const t = s.tour||'Individual Gig';
+        if (!tourMap[t]) tourMap[t] = {count:0, dates:[], gross:0, vc:0, net:0, currencies:new Set()};
+        tourMap[t].count++;
+        tourMap[t].dates.push(s.date);
+        tourMap[t].gross += toEUR(calcGross(s), s.currency);
+        tourMap[t].vc += toEUR(calcVenueCut(s), s.currency);
+        tourMap[t].net += toEUR(calcNet(s), s.currency);
+        tourMap[t].currencies.add(s.currency);
+    });
+    const tourRows = Object.entries(tourMap).map(([name, d]) => {
+        const sorted = d.dates.sort();
+        return [name, d.count, sorted[0], sorted[sorted.length-1], +d.gross.toFixed(2), +d.vc.toFixed(2), +d.net.toFixed(2), +(d.net/d.count).toFixed(2), [...d.currencies].join(',')];
+    });
+    tourRows.sort((a,b) => (b[2]||'').localeCompare(a[2]||''));
+    const wsTours = XLSX.utils.aoa_to_sheet([tourHeaders, ...tourRows]);
+    setColWidths(wsTours, [25, 8, 12, 12, 14, 14, 14, 16, 14]);
+    if (tourRows.length > 0) setAutoFilter(wsTours, `A1:I${tourRows.length+1}`);
+    freezeTopRow(wsTours);
+    XLSX.utils.book_append_sheet(wb, wsTours, 'Tours');
+
+    // ========== SHEET 7: BUNDLE ANALYSIS ==========
+    const bundleHeaders = ['Bundle','# Sold (all-time)','Total Revenue (EUR)','Avg Price (EUR)','Components Pulled'];
+    const bundleRows = BUNDLES.map(b => {
+        let sold = 0, revenue = 0;
+        state.shows.forEach(s => {
+            if (s.sales?.[b.id]) {
+                sold += s.sales[b.id].qty;
+                revenue += toEUR(s.sales[b.id].qty * s.sales[b.id].price, s.currency);
+            }
+        });
+        const compList = b.components.map(c => `${getItem(c).label}: ${sold}`).join(' | ');
+        return [b.label, sold, +revenue.toFixed(2), sold>0?+(revenue/sold).toFixed(2):0, compList];
+    });
+    const wsBundles = XLSX.utils.aoa_to_sheet([bundleHeaders, ...bundleRows]);
+    setColWidths(wsBundles, [22, 14, 18, 14, 50]);
+    freezeTopRow(wsBundles);
+    XLSX.utils.book_append_sheet(wb, wsBundles, 'Bundle Analysis');
+
+    // Write file
+    XLSX.writeFile(wb, `shai_maestro_merch_${exportDate}.xlsx`);
+    showToast('Excel exported!', 'fa-file-excel');
+    if (window._yearEndState) { window._yearEndState.excelBackedUp = true; window.renderYearEndModal(); }
+};
+
+window.exportPDF=()=>{const{jsPDF}=window.jspdf;const d=new jsPDF();d.setFontSize(18);d.text("Shai Maestro Merch Backup",10,10);d.setFontSize(10);let y=20;d.text(`Total Shows: ${state.shows.length}`,10,y+=10);d.text(`Stock:`,10,y+=10);ITEMS.forEach(i=>{const l=getStockLevels(i.id);d.text(`- ${i.label}: home ${l.home}, tour ${l.tour}`,15,y+=6);});d.save("merch_backup.pdf");};
+
 window.addTempItem=()=>{const sel=document.getElementById('shp_temp_itemId'),qty=parseInt(document.getElementById('shp_temp_qty').value),cost=parseFloat(document.getElementById('shp_temp_cost').value);if(!qty||isNaN(cost))return alert("Enter Qty/Cost");tempShipmentItems.push({itemId:sel.value,qty,cost});lastLabelSelection=sel.value;document.getElementById('shp_temp_qty').value='';document.getElementById('shp_temp_cost').value='';window.renderLabel();};
 window.removeTempItem=(i)=>{tempShipmentItems.splice(i,1);window.renderLabel();};
-window.saveShipment=()=>{if(!tempShipmentItems.length)return alert("No items");const d={id:editingShipmentId||Date.now(),date:document.getElementById('shp_date').value,invoice:document.getElementById('shp_invoice').value,shipping:parseFloat(document.getElementById('shp_shipping').value)||0,paid:document.getElementById('shp_paid').checked,paidDate:document.getElementById('shp_paidDate').value,items:tempShipmentItems};if(editingShipmentId){state.shipments[state.shipments.findIndex(s=>s.id===editingShipmentId)]=d;editingShipmentId=null;}else{state.shipments.push(d);setUndo('add_shipment',d);}saveData();window.resetShipmentForm();};
-window.openShipmentModal=(id)=>{const s=state.shipments.find(s=>s.id===id);document.getElementById('modalTitle').innerText="Shipment";document.getElementById('modalBody').innerHTML=`<div class="space-y-2"><p class="text-slate-400 text-xs uppercase font-bold">Inv: ${s.invoice}</p><div class="bg-slate-900/50 p-2 rounded">${s.items.map(i=>`<div>${getItem(i.itemId).label} x${i.qty}</div>`).join('')}</div></div>`;document.getElementById('modalFooter').innerHTML=`<button onclick="closeModal();editShipment(${id})" class="btn-primary py-2 text-sm">Edit</button>`;document.getElementById('modalOverlay').classList.remove('hidden');setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);};
+
+window.saveShipment=()=>{
+    if(!tempShipmentItems.length)return alert("No items");
+    const d={
+        id:editingShipmentId||Date.now(),
+        date:document.getElementById('shp_date').value,
+        invoice:document.getElementById('shp_invoice').value,
+        shipCity:document.getElementById('shp_city').value,
+        shipCountry:document.getElementById('shp_country').value,
+        shipping:parseFloat(document.getElementById('shp_shipping').value)||0,
+        paid:document.getElementById('shp_paid').checked,
+        paidDate:document.getElementById('shp_paidDate').value,
+        items:tempShipmentItems
+    };
+    if(editingShipmentId){
+        state.shipments[state.shipments.findIndex(s=>s.id===editingShipmentId)]=d;
+        editingShipmentId=null;
+    } else {
+        state.shipments.push(d);
+        setUndo('add_shipment',d);
+    }
+    saveData();
+    window.resetShipmentForm();
+};
+
+window.openShipmentModal=(id)=>{
+    const s=state.shipments.find(s=>s.id===id);
+    document.getElementById('modalTitle').innerText="Shipment";
+    const loc = s.shipCity||s.shipCountry ? `${s.shipCity||''}${s.shipCity&&s.shipCountry?', ':''}${s.shipCountry||''}` : '—';
+    document.getElementById('modalBody').innerHTML=`<div class="space-y-2"><p class="text-slate-400 text-xs uppercase font-bold">Inv: ${s.invoice||'—'}</p><p class="text-blue-400 text-xs font-bold"><i class="fas fa-map-marker-alt mr-1"></i>${loc}</p><div class="bg-slate-900/50 p-2 rounded">${s.items.map(i=>`<div class="text-sm">${getItem(i.itemId).label||i.itemId} x${i.qty} <span class="text-slate-500">@€${i.cost}</span></div>`).join('')}</div></div>`;
+    document.getElementById('modalFooter').innerHTML=`<button onclick="closeModal();editShipment(${id})" class="btn-primary py-2 text-sm">Edit</button>`;
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    setTimeout(()=>document.getElementById('modalContent').classList.remove('opacity-0','scale-95'),10);
+};
+
 window.editShipment=(id)=>{editingShipmentId=id;tempShipmentItems=[...state.shipments.find(s=>s.id===id).items];window.router('label');};
 window.closeModal=()=>{document.getElementById('modalContent').classList.add('opacity-0','scale-95');setTimeout(()=>document.getElementById('modalOverlay').classList.add('hidden'),200);};
 window.togglePaidDate=(c)=>{document.getElementById('shp_paidDate').classList.toggle('hidden',!c);};
 window.resetShipmentForm=()=>{editingShipmentId=null;tempShipmentItems=[];window.renderLabel();};
-loadData();window.router('dashboard');
+
+loadData();
+window.router('dashboard');
+checkYearEndAutoPrompt();
     </script>
 </body>
 </html>
